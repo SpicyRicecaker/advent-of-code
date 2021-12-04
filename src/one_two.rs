@@ -1,6 +1,4 @@
-use crate::State;
-
-pub fn run(state: State) {
+pub fn run(state: crate::State) {
     let input = state
         .input("input1.txt")
         .split_whitespace()

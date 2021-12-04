@@ -1,12 +1,10 @@
-use crate::State;
-
 struct Submarine {
     aim: u32,
     horizontal: u32,
     depth: u32,
 }
 
-pub fn run(state: State) {
+pub fn run(state: crate::State) {
     let mut submarine = Submarine {
         aim: 0,
         horizontal: 0,

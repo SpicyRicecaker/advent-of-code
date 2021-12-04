@@ -1,6 +1,4 @@
-use crate::State;
-
-pub fn run(state: State) {
+pub fn run(state: crate::State) {
     // Get input
     let input = state
         .input("input1.txt")
