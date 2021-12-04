@@ -41,7 +41,7 @@ pub fn run(state: crate::State) {
     println!("epsilon & gamma are `{}`", to_num_from_binary(&gamma) * to_num_from_binary(&epsilon));
 }
 
-fn to_num_from_binary(str: &str) -> u32 {
+pub fn to_num_from_binary(str: &str) -> u32 {
     str.chars().rev().enumerate().fold(0, |acc, (i, c)| {
         acc + 2_u32.pow(i as u32) * c.to_digit(10).unwrap() as u32
     })
