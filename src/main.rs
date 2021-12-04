@@ -13,8 +13,7 @@ fn main() {
     let state = config();
 
     // Brings into scope the run function from that module
-    get_run_func_from!(three_three);
+    get_run_func_from!(four);
 
-    // run(state);
-    bitwise::run();
+    run(state);
 }
