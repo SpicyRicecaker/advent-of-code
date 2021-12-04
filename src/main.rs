@@ -1,4 +1,5 @@
 use advent_of_code_2021::config;
+use advent_of_code_2021::fun::bitwise;
 
 // This macro basically takes in a module name as a parameter, and uses the run function of that module
 macro_rules! get_run_func_from {
@@ -14,5 +15,6 @@ fn main() {
     // Brings into scope the run function from that module
     get_run_func_from!(three_three);
 
-    run(state);
+    // run(state);
+    bitwise::run();
 }

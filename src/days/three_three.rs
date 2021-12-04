@@ -47,7 +47,7 @@ fn recurse(
 }
 
 pub fn run(state: crate::State) {
-    let string = state.input("input3test.txt");
+    let string = state.input("input3.txt");
     let length = string.lines().take(1).next().unwrap().chars().count();
 
     // Problem: debuggin the returning of closures is gnarly sometimes

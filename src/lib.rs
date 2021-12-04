@@ -1,4 +1,5 @@
 pub mod days;
+pub mod fun;
 
 use std::env;
 use std::fs;
