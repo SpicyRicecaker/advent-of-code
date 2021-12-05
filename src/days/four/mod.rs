@@ -23,7 +23,7 @@ pub fn run(state: crate::State) {
     let input = state.input("input4test.txt");
     let mut board_input = input.split("\r\n\r\n");
 
-    let called: HashSet<u32> = board_input
+    let called: Vec<u32> = board_input
         .next()
         .unwrap()
         .split(',')
@@ -72,25 +72,27 @@ pub fn run(state: crate::State) {
     // global_board_index.keys().for_each(|key| {
     //     print!("{}, ", key);
     // });
-    let mut cool = global_board_index
-        .iter()
-        .map(|(&key, value)| (key, value.to_vec()))
-        .collect::<Vec<(u32, Vec<Position>)>>();
-    cool.sort_by(|a, b| a.0.cmp(&b.0));
-    cool.iter().for_each(|(key, value)| {
-        print!("key: {}, val: ", key);
+    // let mut cool = global_board_index
+    //     .iter()
+    //     .map(|(&key, value)| (key, value.to_vec()))
+    //     .collect::<Vec<(u32, Vec<Position>)>>();
+    // cool.sort_by(|a, b| a.0.cmp(&b.0));
+    // cool.iter().for_each(|(key, value)| {
+    //     print!("key: {}, val: ", key);
 
-        for ele in value.iter() {
-            print!("{:?}, ", ele);
-        }
-        println!();
-    });
+    //     for ele in value.iter() {
+    //         print!("{:?}, ", ele);
+    //     }
+    //     println!();
+    // });
 
     let mut board: Option<Vec<Vec<Cell>>> = None;
     let mut last_called: Option<u32> = None;
     for call in called {
         // Assign to board_state through global_board_index
+        dbg!(call);
         if let Some(positions) = global_board_index.get(&call) {
+            dbg!(positions.len());
             // println!("---beg-----------");
             // positions.iter().for_each(|p| print!("{:?}", p));
             // println!("---end-----------");
@@ -119,13 +121,13 @@ pub fn run(state: crate::State) {
         });
         for row in board {
             for column in row {
-                // print!("{:#?}, ", column);
+                print!("{:#?}, ", column);
             }
-            // println!();
+            println!();
         }
-        // println!("-----------");
-        // println!("{}", last_called.unwrap());
-        // println!("{}", unmarked_sum * last_called.unwrap());
+        println!("-----------");
+        println!("{}", last_called.unwrap());
+        println!("{}", unmarked_sum * last_called.unwrap());
     }
 }
 
@@ -155,24 +157,24 @@ fn win(board: &[Vec<Cell>]) -> bool {
         }
     }
 
-    let mut diagonals = false;
+    // let mut diagonals = false;
 
-    {
-        let mut topleft = 0;
-        let mut botleft = 0;
+    // {
+    //     let mut topleft = 0;
+    //     let mut botleft = 0;
 
-        (0..board.len()).for_each(|i| {
-            if board[i][i].state == CellState::Lit {
-                topleft += 1;
-            }
-            if board[i][board.len() - i - 1].state == CellState::Lit {
-                botleft += 1;
-            }
-        });
+    //     (0..board.len()).for_each(|i| {
+    //         if board[i][i].state == CellState::Lit {
+    //             topleft += 1;
+    //         }
+    //         if board[i][board.len() - i - 1].state == CellState::Lit {
+    //             botleft += 1;
+    //         }
+    //     });
 
-        if topleft == board.len() || botleft == board.len() {
-            diagonals = true;
-        }
-    }
-    rows || columns || diagonals
+    //     if topleft == board.len() || botleft == board.len() {
+    //         diagonals = true;
+    //     }
+    // }
+    rows || columns
 }
