@@ -20,7 +20,7 @@ struct Cell {
 }
 
 pub fn run(state: crate::State) {
-    let input = state.input("input4test.txt");
+    let input = state.input("input4.txt");
     let mut board_input = input.split("\r\n\r\n");
 
     let called: Vec<u32> = board_input
@@ -90,9 +90,9 @@ pub fn run(state: crate::State) {
     let mut last_called: Option<u32> = None;
     for call in called {
         // Assign to board_state through global_board_index
-        dbg!(call);
+        // dbg!(call);
         if let Some(positions) = global_board_index.get(&call) {
-            dbg!(positions.len());
+            // dbg!(positions.len());
             // println!("---beg-----------");
             // positions.iter().for_each(|p| print!("{:?}", p));
             // println!("---end-----------");
@@ -103,30 +103,39 @@ pub fn run(state: crate::State) {
         // if numbers is greater than or equal to 5
         // Loop over all the boards
         if let Some((usize, win_board)) = board_state.iter().enumerate().find(|(u, b)| win(b)) {
-            // dbg!(usize);
+            println!("solution found for board {}", call);
             board = Some(win_board.to_vec());
             last_called = Some(call);
             break;
         }
+
+        // let count = board_state.iter().enumerate().filter(|(u, b)| win(b)).count();
+        // if count != 0 {
+        //     println!("the count for {} is {}", call, count);
+        //     break;
+        // }
+
+
         // assign to board using the global number index
     }
     if let Some(board) = board {
         // sum of all unmarked numbers * number that was just called
         let unmarked_sum = board.iter().flatten().fold(0, |acc, x| {
-            if x.state == CellState::Lit {
+            if x.state == CellState::Unlit {
                 acc + x.num
             } else {
                 acc
             }
         });
-        for row in board {
-            for column in row {
-                print!("{:#?}, ", column);
-            }
-            println!();
-        }
+        // for row in board {
+        //     for column in row {
+        //         print!("{:#?}, ", column);
+        //     }
+        //     println!();
+        // }
         println!("-----------");
-        println!("{}", last_called.unwrap());
+        println!("last called is {}", last_called.unwrap());
+        println!("unmarked sum is {}", unmarked_sum);
         println!("{}", unmarked_sum * last_called.unwrap());
     }
 }
@@ -144,13 +153,13 @@ fn win(board: &[Vec<Cell>]) -> bool {
     });
 
     let mut columns = false;
-    for row in 0..board.len() {
+    for column in 0..board[0].len() {
         let mut alives = 0;
-        for column in 0..board[0].len() {
+        (0..board.len()).for_each(|row| {
             if board[row][column].state == CellState::Lit {
                 alives += 1;
             }
-        }
+        });
         if alives == 5 {
             columns = true;
             break;
