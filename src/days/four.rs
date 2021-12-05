@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct Position {
     x: usize,
     y: usize,
@@ -19,7 +20,7 @@ struct Cell {
 }
 
 pub fn run(state: crate::State) {
-    let input = state.input("input4.txt");
+    let input = state.input("input4test.txt");
     let mut board_input = input.split("\r\n\r\n");
 
     let called: HashSet<u32> = board_input
@@ -67,25 +68,43 @@ pub fn run(state: crate::State) {
         })
         .collect();
 
-    let mut numbers = 0;
+    // println!("keys");
+    // global_board_index.keys().for_each(|key| {
+    //     print!("{}, ", key);
+    // });
+    let mut cool = global_board_index
+        .iter()
+        .map(|(&key, value)| (key, value.to_vec()))
+        .collect::<Vec<(u32, Vec<Position>)>>();
+    cool.sort_by(|a, b| a.0.cmp(&b.0));
+    cool.iter().for_each(|(key, value)| {
+        print!("key: {}, val: ", key);
+
+        for ele in value.iter() {
+            print!("{:?}, ", ele);
+        }
+        println!();
+    });
+
     let mut board: Option<Vec<Vec<Cell>>> = None;
     let mut last_called: Option<u32> = None;
     for call in called {
-        numbers += 1;
         // Assign to board_state through global_board_index
         if let Some(positions) = global_board_index.get(&call) {
+            // println!("---beg-----------");
+            // positions.iter().for_each(|p| print!("{:?}", p));
+            // println!("---end-----------");
             positions.iter().for_each(|position| {
                 board_state[position.idx][position.y][position.x].state = CellState::Lit;
             })
         }
         // if numbers is greater than or equal to 5
-        if numbers >= 5 {
-            // Loop over all the boards
-            if let Some(win_board) = board_state.iter().find(|b| win(b)) {
-                board = Some(win_board.to_vec());
-                last_called = Some(call);
-                break;
-            }
+        // Loop over all the boards
+        if let Some((usize, win_board)) = board_state.iter().enumerate().find(|(u, b)| win(b)) {
+            // dbg!(usize);
+            board = Some(win_board.to_vec());
+            last_called = Some(call);
+            break;
         }
         // assign to board using the global number index
     }
@@ -98,8 +117,15 @@ pub fn run(state: crate::State) {
                 acc
             }
         });
-        println!("{}", last_called.unwrap());
-        println!("{}", unmarked_sum * last_called.unwrap());
+        for row in board {
+            for column in row {
+                // print!("{:#?}, ", column);
+            }
+            // println!();
+        }
+        // println!("-----------");
+        // println!("{}", last_called.unwrap());
+        // println!("{}", unmarked_sum * last_called.unwrap());
     }
 }
 
