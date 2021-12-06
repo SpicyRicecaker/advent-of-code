@@ -21,12 +21,11 @@ struct Cell {
     state: CellState,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct Board {
     won: bool,
-    state: Vec<Vec<u32>>
+    contents: Vec<Vec<Cell>>,
 }
-
 
 pub fn run(state: crate::State) {
     let input = state.input("input4.txt");
@@ -39,16 +38,13 @@ pub fn run(state: crate::State) {
         .map(|l| l.parse().unwrap())
         .collect();
 
-    // // getting the wincons
-    // board_input.next();
-
     let mut global_board_index: HashMap<u32, Vec<Position>> = HashMap::new();
 
-    let mut board_state: Vec<Vec<Vec<Cell>>> = board_input
+    let mut board_state: Vec<Board> = board_input
         .enumerate()
         .map(|(idx, board)| {
             // get the lines
-            board
+            let contents = board
                 .lines()
                 .enumerate()
                 // for every line
@@ -73,7 +69,11 @@ pub fn run(state: crate::State) {
                         });
                     empty_line
                 })
-                .collect::<Vec<Vec<Cell>>>()
+                .collect::<Vec<Vec<Cell>>>();
+            Board {
+                won: false,
+                contents,
+            }
         })
         .collect();
 
@@ -97,7 +97,7 @@ pub fn run(state: crate::State) {
 
     let mut last_called: Option<u32> = None;
 
-    let mut last_board: Option<Vec<Vec<Cell>>> = None;
+    let mut last_board: Option<usize> = None;
     for call in called {
         // Assign to board_state through global_board_index
         // dbg!(call);
@@ -109,39 +109,53 @@ pub fn run(state: crate::State) {
             // positions.iter().for_each(|p| print!("{:?}", p));
             // println!("---end-----------");
             positions.iter().for_each(|position| {
-                board_state[position.idx][position.y][position.x].state = CellState::Lit;
+                board_state[position.idx].contents[position.y][position.x].state = CellState::Lit;
             })
         }
-        if board_state.len() == 1 {
-            last_board = Some(board_state[0].to_vec());
-        } 
+
         // if numbers is greater than or equal to 5
         // Loop over all the boards
         // If the board wins, remove them from the board state
         // retain only keeps element if closure returns true
-        board_state.retain(|b| !win(b));
-        if board_state.is_empty() {
+
+        // iterate for the boards that have not yet won
+        board_state
+            .iter_mut()
+            .enumerate()
+            .filter(|(_, b)| !b.won)
+            .filter(|(_, b)| win(&b.contents))
+            .for_each(|(idx, b)| {
+                b.won = true;
+                last_board = Some(idx);
+            });
+
+        if board_state.iter().filter(|b| !b.won).count() == 0 {
             last_called = Some(call);
             break;
-        } 
+        }
+
         // let count = board_state.iter().enumerate().filter(|(u, b)| win(b)).count();
         // if count != 0 {
         //     println!("the count for {} is {}", call, count);
         //     break;
         // }
 
-
         // assign to board using the global number index
     }
-    if let Some(board) = last_board {
+    if let Some(board_idx) = last_board {
+        println!("last board to win is {}", board_idx);
         // sum of all unmarked numbers * number that was just called
-        let unmarked_sum = board.iter().flatten().fold(0, |acc, x| {
-            if x.state == CellState::Unlit {
-                acc + x.num
-            } else {
-                acc
-            }
-        });
+        let unmarked_sum = board_state[board_idx]
+            .contents
+            .iter()
+            .flatten()
+            .fold(0, |acc, x| {
+                if x.state == CellState::Unlit {
+                    acc + x.num
+                } else {
+                    acc
+                }
+            });
         // for row in board {
         //     for column in row {
         //         print!("{:#?}, ", column);
