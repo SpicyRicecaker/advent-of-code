@@ -1,3 +1,5 @@
+use crate::State;
+
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -93,12 +95,15 @@ pub fn run(state: crate::State) {
     //     println!();
     // });
 
-    let mut board: Option<Vec<Vec<Cell>>> = None;
     let mut last_called: Option<u32> = None;
+
+    let mut last_board: Option<Vec<Vec<Cell>>> = None;
     for call in called {
         // Assign to board_state through global_board_index
         // dbg!(call);
-        if let Some(positions) = global_board_index.get(&call) {
+
+        // we need to get the entry, then remove it completely from the board
+        if let Some(positions) = global_board_index.remove(&call) {
             // dbg!(positions.len());
             // println!("---beg-----------");
             // positions.iter().for_each(|p| print!("{:?}", p));
@@ -107,15 +112,18 @@ pub fn run(state: crate::State) {
                 board_state[position.idx][position.y][position.x].state = CellState::Lit;
             })
         }
+        if board_state.len() == 1 {
+            last_board = Some(board_state[0].to_vec());
+        } 
         // if numbers is greater than or equal to 5
         // Loop over all the boards
-        if let Some((usize, win_board)) = board_state.iter().enumerate().find(|(u, b)| win(b)) {
-            println!("solution found for board {}", call);
-            board = Some(win_board.to_vec());
+        // If the board wins, remove them from the board state
+        // retain only keeps element if closure returns true
+        board_state.retain(|b| !win(b));
+        if board_state.is_empty() {
             last_called = Some(call);
             break;
-        }
-
+        } 
         // let count = board_state.iter().enumerate().filter(|(u, b)| win(b)).count();
         // if count != 0 {
         //     println!("the count for {} is {}", call, count);
@@ -125,7 +133,7 @@ pub fn run(state: crate::State) {
 
         // assign to board using the global number index
     }
-    if let Some(board) = board {
+    if let Some(board) = last_board {
         // sum of all unmarked numbers * number that was just called
         let unmarked_sum = board.iter().flatten().fold(0, |acc, x| {
             if x.state == CellState::Unlit {
