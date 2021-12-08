@@ -13,7 +13,7 @@ fn main() {
     let state = config();
 
     // Brings into scope the run function from that module
-    get_run_func_from!(seven);
+    get_run_func_from!(seven_two);
 
     run(state);
 }

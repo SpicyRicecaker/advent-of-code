@@ -7,4 +7,4 @@ macro_rules! mod_days {
     };
 }
 
-mod_days!(one, one_two, two, two_two, three, three_three, four, four_two, five, five_two, six, six_two, seven);
+mod_days!(one, one_two, two, two_two, three, three_three, four, four_two, five, five_two, six, six_two, seven, seven_two);
