@@ -1,1 +1,1 @@
-Hey, I noticed that you had multiple days for your advent of 
+https://adventofcode.com/2021 scuffed rust solutions
