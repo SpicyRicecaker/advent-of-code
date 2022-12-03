@@ -1,26 +1,39 @@
-fn get_digit_from_len(len: usize) -> Option<u8> {
-    match len {
-        2 => Some(1),
-        3 => Some(7),
-        4 => Some(4),
-        7 => Some(8),
-        _ => None,
-    }
+#[derive(Debug)]
+struct Display {
+    input: Vec<String>,
+    output: Vec<String>,
 }
 
 fn main() {
-    let state = advent_of_code_2021::config();
-    let mut count = 0;
-    state.input("input8.txt").lines().for_each(|l| {
-        l.split(" | ")
-            .nth(1)
-            .unwrap()
-            .split_whitespace()
-            .for_each(|m| {
-                if get_digit_from_len(m.len()).is_some() {
-                    count += 1;
-                }
+    // num of times strings of 1, 4, 7, 8 length appear in output
+    // 2, 4, 3, 7
+
+    let out = std::fs::read_to_string("res/eight.txt")
+        .unwrap()
+        .lines()
+        .map(|l| {
+            // dbg!(l);
+            let mut iter = l.split('|').map(|s| {
+                // dbg!(s);
+                s.split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
             });
-    });
-    println!("unique numbers: {}", count);
+            Display {
+                input: iter.next().unwrap(),
+                output: iter.next().unwrap(),
+            }
+        })
+        .fold(0, |acc, item| {
+            // dbg!(&item);
+            // dbg!(acc);
+            acc + item.input.iter().fold(0, |acc, item| match item.len() {
+                2 | 4 | 3 | 7 => {
+                    // dbg!(item);
+                    acc + 1
+                },
+                _ => acc,
+            })
+        });
+    dbg!(out);
 }
