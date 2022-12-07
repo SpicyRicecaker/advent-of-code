@@ -143,13 +143,17 @@ fn main() {
 
     // clone because otherwise we might lose nodes while recursing?
     let mut v = vec![];
-    recurse(filesystem.clone(), &mut v);
+    let space_taken = recurse(filesystem.clone(), &mut v);
 
-    // v.sort();
+    let space_remaining = 70_000_000 - space_taken;
 
-    // v.into_iter().rev().find(|n| )
+    println!("{}", space_remaining);
+    v.sort();
 
-    println!("{}", v.into_iter().filter(|&n| n <= 100_000).sum::<usize>());
+    let v = v.into_iter().inspect(|n| println!("{n}")).find(|n| n + space_remaining >= 30_000_000).unwrap();
+
+    dbg!(v);
+    
 }
 
 fn recurse(entry: Rc<RefCell<Entry>>, v: &mut Vec<usize>) -> usize {
