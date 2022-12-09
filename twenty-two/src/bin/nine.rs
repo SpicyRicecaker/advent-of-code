@@ -1,6 +1,6 @@
 use std::{
     collections::HashSet,
-    ops::{Add, Sub},
+    ops::Add,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -59,7 +59,7 @@ fn main() {
                     if traveled.insert(tail) {
                         count += 1;
                     }
-                } 
+                }
                 current = res;
             });
             // the tail always lags behind self
