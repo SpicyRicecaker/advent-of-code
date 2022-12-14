@@ -6,7 +6,7 @@ struct MonkeyTreehouse {
 }
 
 impl MonkeyTreehouse {
-    fn run(&mut self, idx: usize) {
+    pub fn run(&mut self, idx: usize) {
         while let Some(item) = self.monkeys[idx].items.pop_front() {
             let m = &mut self.monkeys[idx];
             m.inspections += 1;
