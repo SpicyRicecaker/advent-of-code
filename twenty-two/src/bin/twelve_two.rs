@@ -10,7 +10,7 @@ fn main() {
 
     // ALL ARE Y FOLLOWED BY X
 
-    let mut starting = None;
+    let mut starting = vec![];
     let mut ending = None;
     let map: Vec<Vec<_>> = std::fs::read_to_string("twelve.txt")
         .unwrap()
@@ -21,8 +21,8 @@ fn main() {
                 .enumerate()
                 .map(|(column, c)| match c {
                     // 'a'
-                    'S' => {
-                        starting = Some([row, column]);
+                    'S' | 'a' => {
+                        starting.push([row, column]);
                         0
                     }
                     // 'z'
@@ -36,12 +36,10 @@ fn main() {
         })
         .collect();
 
-    let starting = {
-        let Some([y, x]) = starting else {
-            panic!("starting not found");
-        };
-        y * map[0].len() + x
-    };
+    let starting: Vec<_> = starting
+        .into_iter()
+        .map(|[y, x]| y * map[0].len() + x)
+        .collect();
 
     let ending = {
         let Some([y, x]) = ending else {
@@ -88,8 +86,9 @@ fn main() {
         }
     }
     // now we can do the bellman ford algorithm
-    let res = bellman_ford(starting, ending, adjacency_list);
-    dbg!(res);
+    let mut v: Vec<_> = starting.into_iter().map(|s| bellman_ford(s, ending, &adjacency_list)).collect();
+    v.sort();
+    dbg!(v[0]);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -113,7 +112,7 @@ impl Default for T {
 fn bellman_ford(
     starting: usize,
     ending: usize,
-    graph: HashMap<usize, HashMap<usize, usize>>,
+    graph: &HashMap<usize, HashMap<usize, usize>>,
 ) -> usize {
     // create an accessed array
     // create a predecessory array
