@@ -1,18 +1,18 @@
-const DXDY: [[i32; 2]; 4] = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct Path {
-    count: u32,
-    traveled: Vec<Vec<bool>>,
-}
+use std::collections::HashMap;
 
 fn main() {
-    // up, down, left or right all can work
+    const dydx: [[isize; 2]; 4] = [[1, 0], [-1, 0], [0, -1], [0, 1]];
 
-    // receive the inputs. let the starting position be S and ending position be E
-    let mut starting: [usize; 2] = [0, 0];
-    let mut ending: [usize; 2] = [0, 0];
-    let b: Vec<Vec<_>> = std::fs::read_to_string("twelve.txt")
+    // we have a graph where every vertex has 4 edges
+    // if we use a matrix, there's no easy way to store the distance from one node to another
+    // if we use an adjacency matrix, it's hard to pinpoint the exact edges from each vertex, because it'd be just 4 compared to n
+    // therefore, the easiest way to implement this would be to use an adjacency list, checking for infinite distances at compile time.
+
+    // ALL ARE Y FOLLOWED BY X
+
+    let mut starting = None;
+    let mut ending = None;
+    let map: Vec<Vec<_>> = std::fs::read_to_string("twelve.txt")
         .unwrap()
         .lines()
         .enumerate()
@@ -20,90 +20,58 @@ fn main() {
             l.chars()
                 .enumerate()
                 .map(|(column, c)| match c {
+                    // 'a'
                     'S' => {
-                        starting[0] = column;
-                        starting[1] = row;
+                        starting = Some([row, column]);
                         0
                     }
+                    // 'z'
                     'E' => {
-                        ending[0] = column;
-                        ending[1] = row;
+                        ending = Some([row, column]);
                         25
                     }
-                    c => (c as u8 - b'a') as u32,
+                    _ => (c as u8 - b'a') as u32,
                 })
                 .collect()
         })
         .collect();
 
-    // the elevation we are going to can be at most 1 higher
+    let starting = starting.unwrap();
+    let ending = ending.unwrap();
 
-    // println!("BOARD");
-    // for y in 0..b.len() {
-    //     for x in 0..b[0].len() {
-    //         print!("{}", (b[y][x] as u8 + b'a') as char);
-    //     }
-    //     println!();
-    // }
-    // println!();
-    // println!();
-    // println!();
+    // build the adjacency list from what we've been given
+    // we'll assign each node a value based on their row * column + column
+    let mut adjacency_list: HashMap<usize, HashMap<usize, usize>> = HashMap::new();
 
-    let traveled = vec![vec![false; b[0].len()]; b.len()];
-    let mut paths = vec![];
+    for row in 0..map.len() {
+        for column in 0..map[0].len() {
+            let current_height = map[row][column];
 
-    // dbg!(starting);
-    // dbg!(ending);
+            let adjacent_coords_with_height = dydx
+                .into_iter()
+                .map(|[dy, dx]| [row as isize + dy, column as isize + dx])
+                .filter(|[y, x]| {
+                    (0..map.len() as isize).contains(y) && (0..map[0].len() as isize).contains(x)
+                })
+                .map(|[y, x]| [y as usize, x as usize])
+                .map(|[y, x]| {
+                    let height = map[y][x];
+                    if height <= current_height + 1 {
+                        ([y, x], 1)
+                    } else {
+                        ([y, x], usize::MAX)
+                    }
+                })
+                // if height is one heigher or lower than current, set dist to 1, otherwise infinity
+                .map(|([y, x], h)| (y * map[0].len() + x, h));
 
-    run(0, starting, ending, traveled, &b, &mut paths);
+            let t = adjacency_list
+                .entry(row * map[0].len() + column)
+                .or_insert_with(HashMap::new);
 
-    paths.sort();
-
-    // we need to find the set of all possible paths toward somewhere, without
-    // repeats
-    let r = &paths[0];
-
-    // println!("{}", r.count);
-    // for y in 0..r.traveled.len() {
-    //     for x in 0..r.traveled[0].len() {
-    //         print!("{}", if r.traveled[y][x] { 1 } else { 0 });
-    //     }
-    //     println!();
-    // }
-}
-
-fn run(
-    count: u32,
-    current: [usize; 2],
-    destination: [usize; 2],
-    mut traveled: Vec<Vec<bool>>,
-    board: &Vec<Vec<u32>>,
-    paths: &mut Vec<Path>,
-) {
-    // dbg!(&traveled);
-    traveled[current[1]][current[0]] = true;
-
-    if current == destination {
-        paths.push(Path {
-            count,
-            traveled: traveled.clone(),
-        });
-        return;
-    }
-
-    DXDY.into_iter().for_each(|[dx, dy]| {
-        let new: [i32; 2] = [current[0] as i32 + dx, current[1] as i32 + dy];
-
-        // dbg!(new);
-
-        if (0..(board.len() as i32)).contains(&new[1])
-            && (0..(board[0].len() as i32)).contains(&new[0])
-            && !traveled[new[1] as usize][new[0] as usize]
-        {
-            let new = [new[0] as usize, new[1] as usize];
-            if board[new[1]][new[0]] <= board[current[1]][current[0]] + 1 {
-                run(count + 1, new, destination, traveled.clone(), board, paths);
+            for (adjacent_coord, height) in adjacent_coords_with_height {
+                t.insert(adjacent_coord, height);
             }
         }
-    });
+    }
 }
