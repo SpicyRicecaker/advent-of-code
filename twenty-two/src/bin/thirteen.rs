@@ -14,7 +14,6 @@ fn main() {
             // dbg!(lines.next());
             // dbg!(lines.next());
 
-            let first = lines.next().unwrap();
             // what do we know?
             // we know that we have to use a stack somehow in the construction of the datastructure
             // we also know that we need to have some way of representing a vec of arbitrary vecs
@@ -22,22 +21,54 @@ fn main() {
             // the problem with using this nested vector here is that it is not fun
             // keeping ownership and a pointer at the same time
 
-            let chars: Vec<_> = first.chars().collect();
-            let mut index = 0;
+            let v_first = {
+                let chars: Vec<_> = lines.next().unwrap().chars().collect();
 
-            let mut v = NestVec::Vec(vec![]);
-            recurse_build(&mut v, &mut index, &chars);
+                let mut index = 0;
 
-            dbg!(v);
-            let separator = std::iter::repeat("=").take(10).collect::<Vec<_>>().join("");
-            println!("{separator}");
+                let mut v = NestVec::Vec(vec![]);
+                recurse_build(&mut v, &mut index, &chars);
+                v
+            };
 
+            let v_second = {
+                let chars: Vec<_> = lines.next().unwrap().chars().collect();
+
+                let mut index = 0;
+
+                let mut v = NestVec::Vec(vec![]);
+                recurse_build(&mut v, &mut index, &chars);
+                v
+            };
 
             // let's say that the vector is now constructed
             // in each iteration we'd have to compare the types of a and b
             // if a holds a list of lists, and b holds a list of lists, then we'd have to drop down a layer
             // if we used matching it'd be pretty elegant because we could match both at the same time
+            let res = recurse_check_valid(&v_first, &v_second);
+            dbg!(res);
         });
+}
+
+fn recurse_check_valid(f: &NestVec, s: &NestVec) -> bool {
+    match (f, s) {
+        (NestVec::Value(_), NestVec::Value(_)) => todo!(),
+        (NestVec::Value(_), NestVec::Vec(_)) => todo!(),
+        (NestVec::Vec(_), NestVec::Value(_)) => todo!(),
+        (NestVec::Vec(a), NestVec::Vec(b)) => {
+            let mut index = 0;
+
+            while index < a.len() && index < b.len() {
+                let res = recurse_check_valid(&a[index], &b[index]);
+
+                if !res {
+                    return false;
+                }
+                index += 1;
+            }
+            true
+        }
+    }
 }
 
 fn recurse_build(parent_v: &mut NestVec, current_char: &mut usize, c: &[char]) {
@@ -78,8 +109,4 @@ fn recurse_build(parent_v: &mut NestVec, current_char: &mut usize, c: &[char]) {
             break;
         }
     }
-}
-
-fn recurse_check() -> bool {
-    todo!()
 }
