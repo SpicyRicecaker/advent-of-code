@@ -1,6 +1,7 @@
-enum NestedVector {
+#[derive(Debug, Clone)]
+enum NestVec {
     Value(u8),
-    Vec(Vec<NestedVector>),
+    Vec(Vec<NestVec>),
 }
 
 fn main() {
@@ -8,7 +9,8 @@ fn main() {
         .unwrap()
         .split("\n\n")
         .map(|pair| pair.lines())
-        .for_each(|mut lines| {
+        .enumerate()
+        .for_each(|(idx, mut lines)| {
             // dbg!(lines.next());
             // dbg!(lines.next());
 
@@ -20,9 +22,16 @@ fn main() {
             // the problem with using this nested vector here is that it is not fun
             // keeping ownership and a pointer at the same time
 
-            let chars = first.chars().collect();
+            let chars: Vec<_> = first.chars().collect();
+            let mut index = 0;
 
-            let f = recurse_build();
+            let mut v = NestVec::Vec(vec![]);
+            recurse_build(&mut v, &mut index, &chars);
+
+            dbg!(v);
+            let separator = std::iter::repeat("=").take(10).collect::<Vec<_>>().join("");
+            println!("{separator}");
+
 
             // let's say that the vector is now constructed
             // in each iteration we'd have to compare the types of a and b
@@ -31,23 +40,44 @@ fn main() {
         });
 }
 
-fn recurse_build() -> NestedVector::Vec {
-            let mut f = NestedVector::Vec(vec![]);
-
-            for c in first.chars() {
-                match c {
-                    // drop down a layer
-                    '[' => {}
-                    // go up a layer
-                    ']' => {}
-                    ',' => continue,
+fn recurse_build(parent_v: &mut NestVec, current_char: &mut usize, c: &[char]) {
+    // this index code is scuffed lol
+    loop {
+        *current_char += 1;
+        match c[*current_char - 1] {
+            // drop down a layer
+            '[' => match parent_v {
+                NestVec::Vec(inside_v) => {
+                    let mut new_v = NestVec::Vec(vec![]);
+                    recurse_build(&mut new_v, current_char, c);
+                    inside_v.push(new_v);
+                }
+                _ => {
+                    panic!()
+                }
+            },
+            // go up a layer
+            ']' => {
+                return;
+            }
+            ',' => {}
+            c => {
+                let num = c.to_digit(10).unwrap() as u8;
+                // add num to current layer
+                match parent_v {
+                    NestVec::Vec(inside_v) => {
+                        inside_v.push(NestVec::Value(num));
+                    }
                     _ => {
-                        let num = c.to_digit(10).unwrap() as u8;
-                        // add num to current layer
+                        panic!()
                     }
                 }
             }
-
+        }
+        if *current_char == c.len() {
+            break;
+        }
+    }
 }
 
 fn recurse_check() -> bool {
