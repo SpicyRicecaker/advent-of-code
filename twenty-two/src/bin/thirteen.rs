@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 #[derive(Debug, Clone)]
 enum NestVec {
     Value(u8),
@@ -5,12 +7,13 @@ enum NestVec {
 }
 
 fn main() {
-    std::fs::read_to_string("thirteen.txt")
+    let res: usize = std::fs::read_to_string("thirteen.txt")
         .unwrap()
         .split("\n\n")
         .map(|pair| pair.lines())
         .enumerate()
-        .for_each(|(idx, mut lines)| {
+        // .filter(|(idx, _)| *idx == 0)
+        .filter_map(|(idx, mut lines)| {
             // dbg!(lines.next());
             // dbg!(lines.next());
 
@@ -45,28 +48,49 @@ fn main() {
             // in each iteration we'd have to compare the types of a and b
             // if a holds a list of lists, and b holds a list of lists, then we'd have to drop down a layer
             // if we used matching it'd be pretty elegant because we could match both at the same time
-            let res = recurse_check_valid(&v_first, &v_second);
+            let res = match recurse_check_valid(&v_first, &v_second) {
+                Ordering::Less | Ordering::Equal => Some(idx + 1),
+                Ordering::Greater => None,
+            };
             dbg!(res);
-        });
+            res
+        })
+        .sum();
+    dbg!(res);
 }
 
-fn recurse_check_valid(f: &NestVec, s: &NestVec) -> bool {
+fn recurse_check_valid(f: &NestVec, s: &NestVec) -> Ordering {
+    // println!("{:?}", f);
+    // println!("{:?}", s);
+    // println!("===============================================================");
     match (f, s) {
-        (NestVec::Value(_), NestVec::Value(_)) => todo!(),
-        (NestVec::Value(_), NestVec::Vec(_)) => todo!(),
-        (NestVec::Vec(_), NestVec::Value(_)) => todo!(),
+        (NestVec::Value(a), NestVec::Value(b)) => a.cmp(b),
+        (NestVec::Value(_), NestVec::Vec(_)) => {
+            // "convert value to list containing its own value as the first value"
+            let t = NestVec::Vec(vec![f.clone()]);
+            recurse_check_valid(&t, s)
+        }
+        (NestVec::Vec(_), NestVec::Value(_)) => {
+            let t = NestVec::Vec(vec![s.clone()]);
+            recurse_check_valid(f, &t)
+        }
         (NestVec::Vec(a), NestVec::Vec(b)) => {
-            let mut index = 0;
-
-            while index < a.len() && index < b.len() {
-                let res = recurse_check_valid(&a[index], &b[index]);
-
-                if !res {
-                    return false;
+            for index in 0..a.len().max(b.len()) {
+                // if left runs out first declare less then
+                // if both run out at the same time OK
+                // if right runs out first declare greater
+                match (a.get(index), b.get(index)) {
+                    (None, None) => break,
+                    (None, Some(_)) => return Ordering::Less,
+                    (Some(_), None) => return Ordering::Greater,
+                    (Some(a), Some(b)) => match recurse_check_valid(a, b) {
+                        o @ Ordering::Less => return o,
+                        Ordering::Equal => {}
+                        o @ Ordering::Greater => return o,
+                    },
                 }
-                index += 1;
             }
-            true
+            Ordering::Equal
         }
     }
 }
