@@ -116,8 +116,25 @@ fn recurse_build(parent_v: &mut NestVec, current_char: &mut usize, c: &[char]) {
                 return;
             }
             ',' => {}
-            c => {
-                let num = c.to_digit(10).unwrap() as u8;
+            ch => {
+                // consume until ] or ,
+                let mut buf = String::new();
+                buf.push(ch);
+
+                loop {
+                    match c[*current_char] {
+                        ',' | ']' => {
+                            break;
+                        }
+                        c => {
+                            buf.push(c);
+                        }
+                    }
+                    *current_char += 1;
+                }
+                // dbg!(&buf);
+
+                let num = buf.parse::<u8>().unwrap();
                 // add num to current layer
                 match parent_v {
                     NestVec::Vec(inside_v) => {
