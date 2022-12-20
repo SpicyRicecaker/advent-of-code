@@ -1,5 +1,8 @@
-use std::time::Instant;
+use std::ops::ControlFlow;
 use regex::Regex;
+use rayon::prelude::*;
+use std::sync::mpsc::sync_channel;
+use std::thread;
 
 #[derive(Debug, Clone, Copy)]
 struct Sensor {
@@ -10,7 +13,7 @@ struct Sensor {
     manhattan_dist: u32,
 }
 
-const MAX: u32 = 4_000_000;
+const MAX: u32 = 20;
 const ONE_MORE: u32 = MAX + 1;
 
 // we also need a list of beacons, because border
@@ -75,21 +78,37 @@ fn main() {
 
     let invalid: Vec<bool> = vec![false; ONE_MORE as usize];
 
-    for row in 0..=MAX as i32 {
-        let instant = Instant::now();
+    let (sender, receiver) = sync_channel(0);
+
+    let mut counter = 0;
+    thread::spawn(move || loop {
+        if receiver.try_recv().is_ok() {
+            counter += 1;
+            // println!("{counter}");
+            println!("processed: {:.2}%", (counter as f64 / MAX as f64) * 100f64);
+        }
+    });
+
+    (0..=MAX as i32).into_par_iter().try_for_each(move |row| {
+        // let instant = Instant::now();
         let mut invalid = invalid.clone();
         let (set, l) = get_invalid_from_row(row, &sensors, &mut invalid);
-        dbg!(l);
+        // dbg!(l);
         if l == MAX {
             let x = set.iter().position(|p| !*p).unwrap();
-            println!("found beacon slot at x: {x}, y: {row}");
-            println!("res: {}", x as u32 * 4000000 + row as u32);
-            break;
+            let mut string = String::new();
+            string.push_str(&format!("found beacon slot at x: {x}, y: {row}"));
+            string.push_str(&format!("res: {}", x as u32 * 4000000 + row as u32));
+            std::fs::write("bob.txt", string).unwrap();
+            return ControlFlow::Break(());
+            // break;
         }
-        println!("processed: {:.2}%", (row as f64 / MAX as f64) * 100f64);
-        dbg!(instant.elapsed());
-        dbg!("estimated time left:", instant.elapsed() * MAX);
-    }
+        let t = sender.clone();
+        t.send(1).unwrap();
+        // dbg!(instant.elapsed());
+        // dbg!("estimated time left:", instant.elapsed() * MAX);
+        ControlFlow::Continue(())
+    });
 
     // let res = get_invalid_from_row(10, &sensors, &beacons);
 }
