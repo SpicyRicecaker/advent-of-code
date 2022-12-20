@@ -4,34 +4,34 @@ use regex::Regex;
 
 #[derive(Debug, Clone, Copy)]
 struct Beacon {
-    x: isize,
-    y: isize,
+    x: i32,
+    y: i32,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct Sensor {
-    x: isize,
-    y: isize,
+    x: i32,
+    y: i32,
     // it cannot be this distance, and because there's no ambiguity it also
     // invalidates the border
-    manhattan_dist: usize,
+    manhattan_dist: u32,
 }
 
-const MAX: usize = 4000000;
-const ONE_MORE: isize = (MAX + 1) as isize;
+const MAX: u32 = 4000000;
+const ONE_MORE: u32 = MAX + 1;
 
 // we also need a list of beacons, because border
-fn get_invalid_from_row(row: isize, sensors: &[Sensor]) -> (Vec<bool>, isize) {
+fn get_invalid_from_row(row: i32, sensors: &[Sensor]) -> (Vec<bool>, isize) {
     let mut invalid: Vec<bool> = vec![false; ONE_MORE as usize];
     let mut invalids = 0;
 
     for sensor in sensors {
         // add the distance from row to sensor
         let abs_y = sensor.y.abs_diff(row);
-        let dist_for_x = sensor.manhattan_dist as isize - abs_y as isize;
+        let dist_for_x = sensor.manhattan_dist as i32 - abs_y as i32;
         if dist_for_x >= 0 {
             // this is the breathing room left for x. We can invalidate all within the ra
-            for x in (sensor.x - dist_for_x).max(0)..=(sensor.x + dist_for_x).min(MAX as isize) {
+            for x in (sensor.x - dist_for_x).max(0)..=(sensor.x + dist_for_x).min(MAX as i32) {
                 if !invalid[x as usize] {
                     invalid[x as usize] = true;
                     invalids += 1;
@@ -48,23 +48,14 @@ fn main() {
     let sensors: Vec<_> = std::fs::read_to_string("fifteen.txt")
         .unwrap()
         .lines()
-        .enumerate()
-        .map(|(idx, l)| {
+        .map(|l| {
             let mut r = r.captures_iter(l);
 
-            // dbg!(idx, l);
+            let g = r.next().unwrap();
+            let (sx, sy) = (g[1].parse::<i32>().unwrap(), g[2].parse::<i32>().unwrap());
 
             let g = r.next().unwrap();
-            let (sx, sy) = (
-                g[1].parse::<isize>().unwrap(),
-                g[2].parse::<isize>().unwrap(),
-            );
-
-            let g = r.next().unwrap();
-            let (bx, by) = (
-                g[1].parse::<isize>().unwrap(),
-                g[2].parse::<isize>().unwrap(),
-            );
+            let (bx, by) = (g[1].parse::<i32>().unwrap(), g[2].parse::<i32>().unwrap());
 
             Sensor {
                 x: sx,
@@ -79,18 +70,19 @@ fn main() {
     // each row has 4_000_000 possible locations
     // each column has 4_000_000 possible locations
 
-    for row in 0..=(MAX as isize) {
+    for row in (0..=MAX as i32) {
         let instant = Instant::now();
         let (set, l) = get_invalid_from_row(row, &sensors);
         // dbg!(l);
         if l == MAX as isize {
             let x = set.into_iter().position(|p| !p).unwrap();
             println!("found beacon slot at x: {x}, y: {row}");
-            println!("res: {}", x as isize * 4000000 + row);
+            println!("res: {}", x as u32 * 4000000 + row as u32);
             break;
         }
         println!("processed: {:.2}%", (row as f64 / MAX as f64) * 100f64);
         dbg!(instant.elapsed());
+        dbg!("estimated time left:", instant.elapsed() * MAX);
     }
 
     // let res = get_invalid_from_row(10, &sensors, &beacons);
