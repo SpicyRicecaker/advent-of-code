@@ -1,12 +1,5 @@
 use std::time::Instant;
-
 use regex::Regex;
-
-#[derive(Debug, Clone, Copy)]
-struct Beacon {
-    x: i32,
-    y: i32,
-}
 
 #[derive(Debug, Clone, Copy)]
 struct Sensor {
@@ -17,24 +10,34 @@ struct Sensor {
     manhattan_dist: u32,
 }
 
-const MAX: u32 = 4000000;
+const MAX: u32 = 4_000_000;
 const ONE_MORE: u32 = MAX + 1;
 
 // we also need a list of beacons, because border
-fn get_invalid_from_row(row: i32, sensors: &[Sensor]) -> (Vec<bool>, isize) {
-    let mut invalid: Vec<bool> = vec![false; ONE_MORE as usize];
+fn get_invalid_from_row<'a>(
+    row: i32,
+    sensors: &[Sensor],
+    invalid: &'a mut Vec<bool>,
+) -> (&'a mut Vec<bool>, u32) {
     let mut invalids = 0;
 
     for sensor in sensors {
         // add the distance from row to sensor
-        let abs_y = sensor.y.abs_diff(row);
-        let dist_for_x = sensor.manhattan_dist as i32 - abs_y as i32;
-        if dist_for_x >= 0 {
-            // this is the breathing room left for x. We can invalidate all within the ra
-            for x in (sensor.x - dist_for_x).max(0)..=(sensor.x + dist_for_x).min(MAX as i32) {
-                if !invalid[x as usize] {
-                    invalid[x as usize] = true;
-                    invalids += 1;
+        let distance_to_row = row.abs_diff(sensor.y);
+
+        // if the absolute value
+        if distance_to_row > sensor.manhattan_dist {
+            continue;
+        }
+
+        let dist_for_x = (sensor.manhattan_dist - distance_to_row) as i32;
+        // this is the breathing room left for x. We can invalidate all within the ra
+        for x in (sensor.x - dist_for_x).max(0)..=(sensor.x + dist_for_x).min(MAX as i32) {
+            if !invalid[x as usize] {
+                invalid[x as usize] = true;
+                invalids += 1;
+                if invalids > MAX {
+                    return (invalid, invalids);
                 }
             }
         }
@@ -70,12 +73,15 @@ fn main() {
     // each row has 4_000_000 possible locations
     // each column has 4_000_000 possible locations
 
-    for row in (0..=MAX as i32) {
+    let invalid: Vec<bool> = vec![false; ONE_MORE as usize];
+
+    for row in 0..=MAX as i32 {
         let instant = Instant::now();
-        let (set, l) = get_invalid_from_row(row, &sensors);
-        // dbg!(l);
-        if l == MAX as isize {
-            let x = set.into_iter().position(|p| !p).unwrap();
+        let mut invalid = invalid.clone();
+        let (set, l) = get_invalid_from_row(row, &sensors, &mut invalid);
+        dbg!(l);
+        if l == MAX {
+            let x = set.iter().position(|p| !*p).unwrap();
             println!("found beacon slot at x: {x}, y: {row}");
             println!("res: {}", x as u32 * 4000000 + row as u32);
             break;
