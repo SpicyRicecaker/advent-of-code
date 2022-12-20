@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::time::Instant;
 
 use regex::Regex;
@@ -18,34 +17,35 @@ struct Sensor {
     manhattan_dist: usize,
 }
 
+const MAX: usize = 4000000;
+const ONE_MORE: isize = (MAX + 1) as isize;
+
 // we also need a list of beacons, because border
-fn get_invalid_from_row(
-    row: isize,
-    sensors: &[Sensor],
-    beacon_coords: &HashSet<(isize, isize)>,
-) -> HashSet<isize> {
-    let mut invalid: HashSet<isize> = HashSet::new();
+fn get_invalid_from_row(row: isize, sensors: &[Sensor]) -> (Vec<bool>, isize) {
+    let mut invalid: Vec<bool> = vec![false; ONE_MORE as usize];
+    let mut invalids = 0;
 
     for sensor in sensors {
         // add the distance from row to sensor
         let abs_y = sensor.y.abs_diff(row);
         let dist_for_x = sensor.manhattan_dist as isize - abs_y as isize;
         if dist_for_x >= 0 {
-            // this is the breathing room left for x. We can invalidate all within the range
-            for x in (sensor.x - dist_for_x)..=(sensor.x + dist_for_x) {
-                if !beacon_coords.contains(&(x, row)) {
-                    invalid.insert(x);
+            // this is the breathing room left for x. We can invalidate all within the ra
+            for x in (sensor.x - dist_for_x).max(0)..=(sensor.x + dist_for_x).min(MAX as isize) {
+                if !invalid[x as usize] {
+                    invalid[x as usize] = true;
+                    invalids += 1;
                 }
             }
         }
     }
-    invalid
+    (invalid, invalids)
 }
 
 fn main() {
     let r = Regex::new(r#"x=(-?\d+), y=(-?\d+)"#).unwrap();
 
-    let (sensors, beacons): (Vec<_>, HashSet<_>) = std::fs::read_to_string("fifteen.txt")
+    let sensors: Vec<_> = std::fs::read_to_string("fifteen.txt")
         .unwrap()
         .lines()
         .enumerate()
@@ -66,36 +66,32 @@ fn main() {
                 g[2].parse::<isize>().unwrap(),
             );
 
-            (
-                Sensor {
-                    x: sx,
-                    y: sy,
-                    manhattan_dist: sx.abs_diff(bx) + sy.abs_diff(by),
-                },
-                (bx, by),
-            )
+            Sensor {
+                x: sx,
+                y: sy,
+                manhattan_dist: sx.abs_diff(bx) + sy.abs_diff(by),
+            }
         })
-        .unzip();
+        .collect();
 
     // dbg!(v);
-
-    let instant = Instant::now();
 
     // each row has 4_000_000 possible locations
     // each column has 4_000_000 possible locations
 
-    for row in 0..=4_000_000 {
-        let set = get_invalid_from_row(row, &sensors, &beacons);
-        dbg!(set.len());
-        if set.len() == 3_999_999 {
-            let x = (0..=4_000_000).find(|i| !set.contains(i)).unwrap();
+    for row in 0..=(MAX as isize) {
+        let instant = Instant::now();
+        let (set, l) = get_invalid_from_row(row, &sensors);
+        // dbg!(l);
+        if l == MAX as isize {
+            let x = set.into_iter().position(|p| !p).unwrap();
             println!("found beacon slot at x: {x}, y: {row}");
-            println!("res: {}", x * row);
+            println!("res: {}", x as isize * 4000000 + row);
             break;
         }
-        println!("processed: {:.2}%", (row as f64 / 4_000_000f64) * 100f64)
+        println!("processed: {:.2}%", (row as f64 / MAX as f64) * 100f64);
+        dbg!(instant.elapsed());
     }
 
-    dbg!(instant.elapsed());
     // let res = get_invalid_from_row(10, &sensors, &beacons);
 }
