@@ -71,16 +71,24 @@ fn main() {
         // dbg!(&i);
 
         // use greedy algo to check if it is worth it to travel there
+        // pick the node which will generate the most pressure for the cheapest
+        // cost in time
 
         let mut p_gen = 0;
+        let mut p_eff = 0f64;
         let mut res = None;
+
         for (k, v) in i.iter().filter(|(k, _)| !m.get(**k).unwrap().o) {
+            let t_taken = v.d as i32 + 1;
             // 1 extra second to turn it on
-            let t_l_local = t_l as i32 - v.d as i32 - 1;
+            let t_l_local = t_l as i32 - t_taken;
             let p_gen_local = t_l_local * m.get(*k).unwrap().r as i32;
 
-            if p_gen_local > p_gen {
+            let p_eff_local = p_gen_local as f64 / t_taken as f64;
+
+            if p_eff_local > p_eff {
                 p_gen = p_gen_local;
+                p_eff = p_eff_local;
                 res = Some((k, v));
             }
         }
@@ -97,7 +105,7 @@ fn main() {
 
                 // {
                 //     let r = i.get(n).unwrap();
-                    // p.push_front(format!("{}{}", n, r.d);
+                // p.push_front(format!("{}{}", n, r.d);
                 // }
                 p.push_front(n);
 
