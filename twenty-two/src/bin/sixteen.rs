@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 
 use regex::Regex;
 
@@ -10,7 +10,6 @@ use regex::Regex;
 #[derive(Debug)]
 struct Info {
     r: u32,
-    o: bool,
     e: HashSet<String>,
 }
 fn main() {
@@ -47,7 +46,6 @@ fn main() {
 
             let mut info = Info {
                 r,
-                o: false,
                 e: HashSet::new(),
             };
 
@@ -58,134 +56,104 @@ fn main() {
             m.insert(s.to_string(), info);
         });
 
-    let mut t_l = 30;
-
-    let mut c = String::from("AA");
-
     // dbg!(&m);
 
-    let mut p_t = 0;
-    while t_l != 0 {
-        // generate map of closest routes to next node using bellman-ford algo
-        let i = bellman_ford(&c, &m);
-        // dbg!(&i);
+    let mut p_g = 0;
+    let mut path_g = vec![];
 
-        // use greedy algo to check if it is worth it to travel there
-        // pick the node which will generate the most pressure for the cheapest
-        // cost in time
+    recurse(
+        30,
+        String::from("AA"),
+        0,
+        &m,
+        HashSet::new(),
+        HashSet::new(),
+        &mut p_g,
+        vec![],
+        &mut path_g,
+    );
 
-        let mut p_gen = 0;
-        let mut p_eff = 0f64;
-        let mut res = None;
-
-        for (k, v) in i.iter().filter(|(k, _)| !m.get(**k).unwrap().o) {
-            let t_taken = v.d as i32 + 1;
-            // 1 extra second to turn it on
-            let t_l_local = t_l as i32 - t_taken;
-            let p_gen_local = t_l_local * m.get(*k).unwrap().r as i32;
-
-            let p_eff_local = p_gen_local as f64 / t_taken as f64;
-
-            if p_eff_local > p_eff {
-                p_gen = p_gen_local;
-                p_eff = p_eff_local;
-                res = Some((k, v));
-            }
-        }
-
-        if let Some((k, v)) = res {
-            t_l -= v.d + 1;
-
-            {
-                let mut p = VecDeque::new();
-
-                let mut n: &str = k;
-
-                let mut d = 0;
-
-                // {
-                //     let r = i.get(n).unwrap();
-                // p.push_front(format!("{}{}", n, r.d);
-                // }
-                p.push_front(n);
-
-                while n != c {
-                    let r = i.get(n).unwrap();
-                    n = r.p.unwrap();
-                    d += r.d;
-                    p.push_front(n);
-                }
-
-                println!(
-                    r##"took path {p:?},
-                 which took {d} minute(s),
-                 and for the next {t_l} minute(s) will generate 
-                 {p_gen} pressure 🥲"##
-                );
-            }
-
-            c = k.to_string();
-            p_t += p_gen;
-        } else {
-            // return
-            break;
-        }
-        // open gate
-        println!("moved to {c} 😀");
-        m.get_mut(&c).unwrap().o = true;
-    }
-    dbg!(p_t);
+    dbg!(p_g);
+    dbg!(path_g);
 }
 
-#[derive(Debug)]
-struct Metrics<'a> {
-    d: u32,
-    a: bool,
-    p: Option<&'a str>,
+#[derive(Debug, Clone)]
+enum Action {
+    OpenValve(String, u32),
+    GotoValve(String, u32),
 }
 
-fn bellman_ford<'a>(s: &str, m: &'a HashMap<String, Info>) -> HashMap<&'a str, Metrics<'a>> {
-    let mut i: HashMap<&str, Metrics> = m
-        .keys()
-        .map(|k| {
-            (
-                k.as_str(),
-                Metrics {
-                    d: u32::MAX,
-                    a: false,
-                    p: None,
-                },
-            )
-        })
-        .collect();
+fn recurse(
+    t_l: u32,
+    c: String,
+    p: u32,
+    m: &HashMap<String, Info>,
+    o: HashSet<String>,
+    t: HashSet<String>,
+    p_g: &mut u32,
+    path: Vec<Action>,
+    path_g: &mut Vec<Action>,
+) {
+    // brute force algo, assuming infinite compute:
+    //   2 actions
+    //     1. move to a new node
+    //     2. open current valve
+    // minutes, or if all the valves are opened
 
-    {
-        let r = i.get_mut(s).unwrap();
-        r.d = 0;
-        r.a = true;
+    // let v, p, t_l, m, c
+    // if time left is 0
+    //   set p_g = max(p_g, p)
+    // if !m[c].o
+    //   m clone
+    //   m set m[c] open
+    //   recurse (m, t_l - 1, p + (t_l - 1) * m[c].v, ..)
+    // for n in m[c]
+    //   set c clone to n
+    //   recurse (m clone, c, ..)
+
+    // dbg!("FUC");
+    if p > *p_g {
+        *p_g = p;
+        *path_g = path.clone();
+    }
+    // dbg!("FUC");
+    if t_l == 0 {
+        return;
     }
 
-    loop {
-        let mut edited = false;
-        for n in m.keys() {
-            if !i.get(n.as_str()).unwrap().a {
-                continue;
-            }
+    // dbg!("FUC");
+    let r = m.get(&c).unwrap();
+    let c_o = o.contains(&c);
 
-            for e in m.get(n.as_str()).unwrap().e.iter() {
-                let d_new = i.get(n.as_str()).unwrap().d + 1;
-                if d_new < i.get(e.as_str()).unwrap().d {
-                    edited = true;
-                    let r = i.get_mut(e.as_str()).unwrap();
-                    r.d = d_new;
-                    r.a = true;
-                    r.p = Some(n);
-                }
-            }
+    if !c_o && r.r != 0 {
+        let mut o = o.clone();
+        o.insert(c.clone());
+        let mut path = path.clone();
+        // dbg!(p + (t_l - 1));
+        path.push(Action::OpenValve(c.clone(), p + (t_l - 1) * r.r));
+        let mut t = HashSet::new();
+        t.insert(c.clone());
+        recurse(t_l - 1, c, p + (t_l - 1) * r.r, m, o, t, p_g, path, path_g);
+    } 
+
+        for n in r.e.iter() {
+        if t.contains(n) {
+            continue;
         }
-        if !edited {
-            break;
-        }
+
+        let mut t = t.clone();
+        t.insert(n.clone());
+
+        let mut path = path.clone();
+        path.push(Action::GotoValve(n.clone(), p));
+
+        recurse(t_l - 1, n.clone(), p, m, o.clone(), t, p_g, path, path_g);
     }
-    i
 }
+
+// time complexity would be the (average number of edges per node + 1) to the
+// power of 30, which is around 2^30
+
+// are there any reduntant cases we can remove?
+// immediately going back the way we came without opening anything would be redundant
+// we build up statik shiv charges and discharge it when we choose to open a valve
