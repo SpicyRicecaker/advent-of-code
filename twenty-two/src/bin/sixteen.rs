@@ -1,17 +1,20 @@
-use std::collections::{HashMap, HashSet};
-
 use regex::Regex;
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Instant,
+};
 
 // #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 // struct Node {
 //     label:
 // }
 
-#[derive(Debug)]
-struct Info {
-    r: u32,
-    e: HashSet<String>,
+#[derive(Clone, Copy)]
+struct Cell {
+    r: u8,
+    b: u64,
 }
+
 fn main() {
     // we have a graph with values of each node and a distance between each node of 1
     // we can travel a maximum of 30 times - the amount of times we attempt to open a pressure vault
@@ -30,69 +33,86 @@ fn main() {
     //   t -= 1
     //   l = i
 
-    let mut m: HashMap<String, Info> = HashMap::new();
+    let ((lookup, list), a_index): ((Vec<_>, Vec<_>), usize) = {
+        let mut legend: HashMap<String, usize> = HashMap::new();
 
-    let regex =
-        Regex::new(r#"Valve ([A-Z]{2}) has flow rate=(\d+); tunnels? leads? to valves? (.*)"#)
-            .unwrap();
-    std::fs::read_to_string("sixteen.txt")
-        .unwrap()
-        .lines()
-        .for_each(|l| {
-            let c = regex.captures(l).unwrap();
+        let mut counter = 0..;
 
-            let s = &c[1];
-            let r = c[2].parse::<u32>().unwrap();
+        let mut connections: BTreeMap<usize, (u32, Vec<usize>)> = BTreeMap::new();
 
-            let mut info = Info {
-                r,
-                e: HashSet::new(),
-            };
+        let regex =
+            Regex::new(r#"Valve ([A-Z]{2}) has flow rate=(\d+); tunnels? leads? to valves? (.*)"#)
+                .unwrap();
 
-            c[3].split(", ").for_each(|s| {
-                info.e.insert(s.to_string());
+        // hashmap < vectors < bitmaps
+
+        // the problem is if we use bitmaps there's no way to lookup a flag without
+        // making our own hashing function basically, though they work wonderfully with traveled + opened vectors
+
+        // we use bitmaps instead of integers lol
+        // it will be a 2x32 bit bitmap
+
+        // sol 3: we use bitmaps and just convert our current into an adjacency matrix
+
+        std::fs::read_to_string("sixteen.txt")
+            .unwrap()
+            .lines()
+            .for_each(|l| {
+                let c = regex.captures(l).unwrap();
+
+                let s = &c[1];
+                let r = c[2].parse::<u32>().unwrap();
+
+                let parent = *legend
+                    .entry(s.to_string())
+                    .or_insert_with(|| counter.next().unwrap());
+
+                c[3].split(", ").for_each(|s| {
+                    let edge = *legend
+                        .entry(s.to_string())
+                        .or_insert_with(|| counter.next().unwrap());
+                    // dbg!(edge);
+                    connections
+                        .entry(parent)
+                        .or_insert((r, Vec::new()))
+                        .1
+                        .push(edge);
+                });
             });
+        // dbg!(legend.len());
 
-            m.insert(s.to_string(), info);
-        });
+        // convert to adjacency matrix + lookup matrix
+        // for traveled & opened, use u64, since we know there are only 57 elements max lol
+        // let adjacency_list: Vec<Vec<u8>> = vec![vec![]; legend.len()];
+        (
+            connections.into_iter().map(|(_, (r, c))| (r, c)).unzip(),
+            *legend.get("AA").unwrap(),
+        )
+    };
 
-    // dbg!(&m);
-
+    // // dbg!(&m);
     let mut p_g = 0;
-    let mut path_g = vec![];
 
-    recurse(
-        30,
-        String::from("AA"),
-        0,
-        &m,
-        HashSet::new(),
-        HashSet::new(),
-        &mut p_g,
-        vec![],
-        &mut path_g,
-    );
+    let instant = Instant::now();
+
+    dbg!(&lookup, &list, a_index);
+
+    recurse(30, a_index, 0, &lookup, &list, 0, 0, &mut p_g);
+
+    dbg!(instant.elapsed());
 
     dbg!(p_g);
-    dbg!(path_g);
-}
-
-#[derive(Debug, Clone)]
-enum Action {
-    OpenValve(String, u32),
-    GotoValve(String, u32),
 }
 
 fn recurse(
     t_l: u32,
-    c: String,
+    c: usize,
     p: u32,
-    m: &HashMap<String, Info>,
-    o: HashSet<String>,
-    t: HashSet<String>,
+    lookup: &[u32],
+    list: &Vec<Vec<usize>>,
+    o: u64,
+    t: u64,
     p_g: &mut u32,
-    path: Vec<Action>,
-    path_g: &mut Vec<Action>,
 ) {
     // brute force algo, assuming infinite compute:
     //   2 actions
@@ -111,49 +131,41 @@ fn recurse(
     //   set c clone to n
     //   recurse (m clone, c, ..)
 
-    // dbg!("FUC");
-    if p > *p_g {
-        *p_g = p;
-        *path_g = path.clone();
-    }
-    // dbg!("FUC");
     if t_l == 0 {
+        if p > *p_g {
+            *p_g = p;
+        }
         return;
     }
 
-    // dbg!("FUC");
-    let r = m.get(&c).unwrap();
-    let c_o = o.contains(&c);
+    let r = lookup[c];
+    let bin = 0b1 << c;
+    let c_o = bin & o == bin;
+    // dbg!(c, c_o, r);
 
-    if !c_o && r.r != 0 {
-        let mut o = o.clone();
-        o.insert(c.clone());
-        let mut path = path.clone();
-        // dbg!(p + (t_l - 1));
-        path.push(Action::OpenValve(c.clone(), p + (t_l - 1) * r.r));
-        let mut t = HashSet::new();
-        t.insert(c.clone());
-        recurse(t_l - 1, c, p + (t_l - 1) * r.r, m, o, t, p_g, path, path_g);
-    } 
+    if !c_o && r != 0 {
+        // dbg!("ff");
+        let o = o | bin;
+        let t = bin;
+        recurse(t_l - 1, c, p + (t_l - 1) * r, lookup, list, o, t, p_g);
+    }
 
-        for n in r.e.iter() {
-        if t.contains(n) {
+    for n in list[c].iter() {
+        let bin = 0b1 << n;
+        if bin & t == bin {
             continue;
         }
+        // dbg!("hello world");
 
-        let mut t = t.clone();
-        t.insert(n.clone());
-
-        let mut path = path.clone();
-        path.push(Action::GotoValve(n.clone(), p));
-
-        recurse(t_l - 1, n.clone(), p, m, o.clone(), t, p_g, path, path_g);
+        let t = t | bin;
+        // println!("t: {t:b} bin:{bin:b}");
+        recurse(t_l - 1, *n, p, lookup, list, o, t, p_g);
     }
 }
 
-// time complexity would be the (average number of edges per node + 1) to the
-// power of 30, which is around 2^30
+// // time complexity would be the (average number of edges per node + 1) to the
+// // power of 30, which is around 2^30
 
-// are there any reduntant cases we can remove?
-// immediately going back the way we came without opening anything would be redundant
-// we build up statik shiv charges and discharge it when we choose to open a valve
+// // are there any reduntant cases we can remove?
+// // immediately going back the way we came without opening anything would be redundant
+// // we build up statik shiv charges and discharge it when we choose to open a valve
