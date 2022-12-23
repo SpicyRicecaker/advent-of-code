@@ -95,7 +95,7 @@ fn main() {
 
     let instant = Instant::now();
 
-    dbg!(&lookup, &list, a_index);
+    // dbg!(&lookup, &list, a_index);
 
     recurse(30, a_index, 0, &lookup, &list, 0, 0, &mut p_g);
 
