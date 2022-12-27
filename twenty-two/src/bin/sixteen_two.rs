@@ -1,6 +1,7 @@
 use regex::Regex;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
+    ops::AddAssign,
     time::Instant,
 };
 
@@ -22,276 +23,296 @@ fn main() {
     //   t -= 1
     //   l = i
 
-    let ((lookup, list), a_index, legend): ((Vec<_>, Vec<_>), usize, HashMap<usize, String>) = {
-        let mut legend: HashMap<String, usize> = HashMap::new();
+    // a queue is the correct solution to this problem, however, the main problem remains how to take care of repeats
 
-        let mut counter = 0..;
+    let mut r = RecursionInfo::new();
+    r.run();
+    // expect DD20*28(560) + BB13*25(325) + JJ21*21(441) + HH22*13(286)
+    dbg!(r);
+}
 
-        let mut connections: BTreeMap<usize, (u32, Vec<usize>)> = BTreeMap::new();
+#[derive(Debug)]
+struct RecursionInfo {
+    players: usize,
+    state_best: State,
+    t: HashMap<usize, u32>,
+    m: Vec<Vec<u32>>,
+    flows: Vec<u32>,
+    i_a: usize,
+    worklist: VecDeque<State>,
+}
 
-        let regex =
-            Regex::new(r#"Valve ([A-Z]{2}) has flow rate=(\d+); tunnels? leads? to valves? (.*)"#)
-                .unwrap();
+impl RecursionInfo {
+    fn new() -> Self {
+        let (m, flows, i_a) = {
+            let mut legend: Vec<String> = vec![];
+            let mut m: BTreeMap<usize, (u32, Vec<usize>)> = BTreeMap::new();
 
-        // hashmap < vectors < bitmaps
+            let regex = Regex::new(
+                r#"Valve ([A-Z]{2}) has flow rate=(\d+); tunnels? leads? to valves? (.*)"#,
+            )
+            .unwrap();
 
-        // the problem is if we use bitmaps there's no way to lookup a flag without
-        // making our own hashing function basically, though they work wonderfully with traveled + opened vectors
+            std::fs::read_to_string("sixteen.txt")
+                .unwrap()
+                .lines()
+                .for_each(|l| {
+                    let c = regex.captures(l).unwrap();
 
-        // we use bitmaps instead of integers lol
-        // it will be a 2x32 bit bitmap
+                    let s = &c[1];
+                    let r = c[2].parse::<u32>().unwrap();
 
-        // sol 3: we use bitmaps and just convert our current into an adjacency matrix
+                    let parent = legend.iter().position(|key| key == s).unwrap_or_else(|| {
+                        legend.push(s.to_string());
+                        legend.len() - 1
+                    });
 
-        std::fs::read_to_string("sixteen.txt")
-            .unwrap()
-            .lines()
-            .for_each(|l| {
-                let c = regex.captures(l).unwrap();
+                    c[3].split(", ").for_each(|s| {
+                        let edge = legend.iter().position(|key| key == s).unwrap_or_else(|| {
+                            legend.push(s.to_string());
+                            legend.len() - 1
+                        });
 
-                let s = &c[1];
-                let r = c[2].parse::<u32>().unwrap();
-
-                let parent = *legend
-                    .entry(s.to_string())
-                    .or_insert_with(|| counter.next().unwrap());
-
-                c[3].split(", ").for_each(|s| {
-                    let edge = *legend
-                        .entry(s.to_string())
-                        .or_insert_with(|| counter.next().unwrap());
-                    // dbg!(edge);
-                    connections
-                        .entry(parent)
-                        .or_insert((r, Vec::new()))
-                        .1
-                        .push(edge);
+                        m.entry(parent).or_insert((r, Vec::new())).1.push(edge);
+                    })
                 });
+            let (flows, m): (Vec<_>, Vec<_>) = m.values().cloned().unzip();
+
+            let index_a = legend.iter().position(|s| s == "AA").unwrap();
+            // we have map + flows, need to convert into an adjacency matrix
+            let mut x = vec![vec![u32::MAX; flows.len()]; flows.len()];
+
+            for (k, v) in m.into_iter().enumerate() {
+                x[k][k] = 0;
+                for &n in v.iter() {
+                    x[k][n] = 1;
+                }
+            }
+
+            let m = floyd_warshall(x);
+
+            dbg!(&m);
+
+            // generate new flow list and matric by collapsing old
+            // .||    .|
+            // --| -> -|
+            // ---
+
+            let iter = (0..m.len()).filter(|&n| flows[n] != 0 || n == index_a);
+
+            let mut i_a = 0;
+
+            let m: Vec<Vec<_>> = iter
+                .clone()
+                .map(|y| {
+                    if y == index_a {
+                        i_a = y;
+                    }
+
+                    iter.clone().map(|x| m[y][x]).collect()
+                })
+                .collect();
+
+            let flows: Vec<_> = iter.map(|y| flows[y]).collect();
+
+            // convert to adjacency matrix + lookup matrix
+            // for traveled & opened, use u64, since we know there are only 57 elements max lol
+            (m, flows, i_a)
+        };
+        let players = 1;
+        Self {
+            players,
+            state_best: State {
+                v_pl: vec![
+                    Player {
+                        t_l: 30,
+                        alive: true,
+                        c: i_a
+                    };
+                    players
+                ],
+                p: Logu32::new(0),
+                t: 0b1 << i_a,
+                t_path: vec![i_a],
+            },
+            t: HashMap::new(),
+            m,
+            flows,
+            i_a,
+            worklist: VecDeque::new(),
+        }
+    }
+
+    fn run_cycle(
+        &mut self,
+        i: usize,
+        dead_count: &mut u32,
+        mut s: State,
+        worklist: &mut VecDeque<State>,
+    ) {
+        let p = &s.v_pl[i];
+
+        // if !p.alive {
+        //     *dead_count += 1;
+        //     // worklist.push_back(s);
+        // } else {
+        // try traversing
+        let mut is_edge_exist = false;
+
+        self.m[p.c]
+            .iter()
+            .enumerate()
+            .filter(|(_, dist)| p.t_l > **dist)
+            .filter(|&(idx, _)| {
+                let bin = 0b1 << idx;
+                bin & s.t != bin
+            })
+            .map(|(i, dist)| (i, p.t_l - *dist - 1))
+            .for_each(|(idx, t_l)| {
+                let mut s = s.clone();
+                s.p += t_l * self.flows[idx];
+                s.t |= 0b1 << idx;
+                s.t_path.push(idx);
+
+                let p = &mut s.v_pl[i];
+                *p = Player { t_l, c: idx, ..*p };
+
+                is_edge_exist = true;
+
+                worklist.push_back(s);
             });
-        // dbg!(legend.len());
 
-        // convert to adjacency matrix + lookup matrix
-        // for traveled & opened, use u64, since we know there are only 57 elements max lol
-        // let adjacency_list: Vec<Vec<u8>> = vec![vec![]; legend.len()];
-        (
-            connections.into_iter().map(|(_, (r, c))| (r, c)).unzip(),
-            *legend.get("AA").unwrap(),
-            legend.into_iter().map(|(k, v)| (v, k)).collect(),
-        )
-    };
-
-    // // dbg!(&m);
-    let mut p_g = 0;
-    // let mut path_g = vec![];
-
-    let instant = Instant::now();
-
-    // dbg!(&lookup, &list, a_index);
-
-    recurse(
-        26,
-        [a_index, a_index],
-        0,
-        &lookup,
-        &list,
-        0,
-        [0b1 << a_index, 0b1 << a_index],
-        Turn::Me,
-        &mut p_g,
-        [true, true], // &mut path_g,
-                      // vec![],
-    );
-
-    dbg!(instant.elapsed());
-
-    dbg!(p_g);
-    // let path_g: Vec<_> = path_g
-    //     .into_iter()
-    //     .map(|a| match a {
-    //         Action::Open(a, b, c) => Action2::Open(a, b, legend.get(&c).unwrap().clone()),
-    //         Action::Goto(a, c) => Action2::Goto(a, legend.get(&c).unwrap().clone()),
-    //     })
-    //     .collect();
-    // dbg!(path_g);
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Turn {
-    Me = 0,
-    Elephant = 1,
-}
-
-impl Turn {
-    #[inline(always)]
-    fn switch(self) -> Self {
-        match self {
-            Turn::Me => Turn::Elephant,
-            Turn::Elephant => Turn::Me,
+        if !is_edge_exist {
+            s.v_pl[i].alive = false;
+            // worklist.push_back(s);
+            *dead_count += 1;
         }
+        // }
+    }
+
+    fn run(&mut self) {
+        self.worklist.push_back(self.state_best.clone());
+
+        while let Some(s) = self.worklist.pop_front() {
+            let mut dead_count = 0;
+
+            let mut worklist_local: VecDeque<State> = VecDeque::new();
+            self.run_cycle(0, &mut dead_count, s.clone(), &mut worklist_local);
+            self.worklist.append(&mut worklist_local);
+
+            if dead_count as usize == s.v_pl.len() {
+                // compare
+                if s.p > self.state_best.p {
+                    self.state_best.p = s.p;
+                }
+            }
+        }
+
+        // while let Some(s) = self.worklist.pop_front() {
+        //     // if our current traveled exists in t, lookup
+        //     let mut worklist_local: VecDeque<State> = VecDeque::new();
+
+        //     let mut dead_count = 0;
+
+        //     // alive, in which case we try to move
+        //     //   if we have no traversable connections, dc
+        //     // dead, in which case we don't do anything, and wait for the other to finish
+
+        //     for i in 0..self.players {
+        //         if i == 0 {
+        //             self.run_cycle(i, &mut dead_count, s.clone(), &mut worklist_local);
+        //         } else {
+        //             // pull out what is currently inside the local worklist
+        //             let mut item_idx = 0;
+        //             let worklist_previous_len = worklist_local.len();
+        //             loop {
+        //                 if item_idx == worklist_previous_len {
+        //                     break;
+        //                 }
+
+        //                 let s = worklist_local.pop_front().unwrap();
+
+        //                 self.run_cycle(i, &mut dead_count, s.clone(), &mut worklist_local);
+
+        //                 item_idx += 1;
+        //             }
+        //         }
+        //     }
+
+        //     self.worklist.append(&mut worklist_local);
+
+        //     if dead_count as usize == s.v_pl.len() {
+        //         // compare
+        //         if s.p > self.p_highest {
+        //             self.p_highest = s.p;
+        //         }
+        //     }
+        // }
     }
 }
 
-// #[derive(Debug, Clone)]
-// enum Action {
-//     Open(Turn, u32, usize),
-//     Goto(Turn, usize),
-// }
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+struct Logu32 {
+    value: u32,
+    v: Vec<u32>,
+}
 
-// #[derive(Debug, Clone)]
-// enum Action2 {
-//     Open(Turn, u32, String),
-//     Goto(Turn, String),
-// }
+impl Logu32 {
+    fn new(value: u32) -> Self {
+        Self { value, v: vec![] }
+    }
+}
 
-#[inline(always)]
-fn recurse(
+impl AddAssign<u32> for Logu32 {
+    fn add_assign(&mut self, rhs: u32) {
+        self.v.push(rhs);
+        self.value += rhs;
+    }
+}
+
+impl PartialEq<u32> for Logu32 {
+    fn eq(&self, other: &u32) -> bool {
+        self.value == *other
+    }
+}
+
+impl PartialOrd<u32> for Logu32 {
+    fn partial_cmp(&self, other: &u32) -> Option<std::cmp::Ordering> {
+        self.value.partial_cmp(other)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct State {
+    v_pl: Vec<Player>,
+    p: Logu32,
+    t: usize,
+    t_path: Vec<usize>,
+}
+
+#[derive(Debug, Clone)]
+struct Player {
     t_l: u32,
-    c: [usize; 2],
-    p: u32,
-    lookup: &[u32],
-    list: &Vec<Vec<usize>>,
-    o: u64,
-    t: [u64; 2],
-    turn: Turn,
-    p_g: &mut u32,
-    alive: [bool; 2],
-    // path_g: &mut Vec<Action>,
-    // path: Vec<Action>,
-) {
-    // brute force algo, assuming infinite compute:
-    // for each of 2 ppl
-    //   2 actions
-    //     1. move to a new node
-    //     2. open current valve
-    // the problem is the total of four actions needs to be done for 1 recursion statement.
-    // the simple way to clone all our values
-
-    // let v, p, t_l, m, c
-    // if time left is 0
-    //   set p_g = max(p_g, p)
-    // if !m[c].o
-    //   m clone
-    //   m set m[c] open
-    //   recurse (m, t_l - 1, p + (t_l - 1) * m[c].v, ..)
-    // for n in m[c]
-    //   set c clone to n
-    //   recurse (m clone, c, ..)
-
-    if t_l == 0 {
-        if p > *p_g {
-            // dbg!(p, " 123123123123123");
-            *p_g = p;
-            // *path_g = path;
-        }
-        return;
-    }
-
-    // dbg!(turn as usize);
-    let c1 = c[turn as usize];
-
-    let r = lookup[c1];
-    let c1_bin = 0b1 << c1;
-    let c_o = c1_bin & o == c1_bin;
-    // dbg!(c, c_o, r);
-    
-    let new = turn.switch();
-
-    let mut did_something = false;
-    if !c_o && r != 0 {
-        // dbg!("ff");
-        let o = o | c1_bin;
-        let mut t = t;
-        t[turn as usize] = c1_bin;
-
-        // let mut path = path.clone();
-        // path.push(Action::Open(turn, p + (t_l - 1) * r, c1));
-
-        did_something = true;
-
-        // if t.switch is not alive
-        //   don't switch
-        //   tick down time
-
-        recurse(
-            if !alive[new as usize] || turn == Turn::Elephant {
-                t_l - 1
-            } else {
-                t_l
-            },
-            c,
-            p + (t_l - 1) * r,
-            lookup,
-            list,
-            o,
-            t,
-            if !alive[new as usize] { turn } else { new },
-            p_g,
-            alive, // path_g,
-                   // path,
-        );
-    }
-    for n in list[c1].iter() {
-        let bin = 0b1 << n;
-        if bin & t[turn as usize] == bin {
-            continue;
-        }
-        // dbg!("hello world");
-
-        let mut t = t;
-        t[turn as usize] |= bin;
-
-        let mut c = c;
-        c[turn as usize] = *n;
-        // println!("t: {t:b} bin:{bin:b}");
-
-        // let mut path = path.clone();
-        // path.push(Action::Goto(turn, *n));
-
-        did_something = true;
-
-        recurse(
-            if !alive[new as usize] || turn == Turn::Elephant {
-                t_l - 1
-            } else {
-                t_l
-            },
-            c,
-            p,
-            lookup,
-            list,
-            o,
-            t,
-            if !alive[new as usize] { turn } else { new },
-            p_g,
-            alive, // path_g,
-                   // path,
-        );
-    }
-
-    // do nothing?
-    if !did_something {
-        let mut alive = alive;
-        alive[turn as usize] = false;
-
-        recurse(
-            if turn == Turn::Elephant { t_l - 1 } else { t_l },
-            c,
-            p,
-            lookup,
-            list,
-            o,
-            t,
-            turn.switch(),
-            p_g,
-            alive, // path_g,
-                   // path,
-        );
-    }
+    alive: bool,
+    c: usize,
 }
 
-// // time complexity would be the (average number of edges per node + 1) to the
-// // power of 30, which is around 2^30
+fn floyd_warshall(mut a: Vec<Vec<u32>>) -> Vec<Vec<u32>> {
+    for k in 0..a.len() {
+        for i in 0..a.len() {
+            for j in 0..a.len() {
+                if a[i][j] > a[i][k].saturating_add(a[k][j]) {
+                    a[i][j] = a[i][k].saturating_add(a[k][j]);
+                }
+            }
+        }
+    }
+    a
+}
 
-// // are there any reduntant cases we can remove?
-// // immediately going back the way we came without opening anything would be redundant
-// // we build up statik shiv charges and discharge it when we choose to open a valve
+// time complexity would be the (average number of edges per node + 1) to the
+// power of 30, which is around 2^30
+
+// are there any reduntant cases we can remove?
+// immediately going back the way we came without opening anything would be redundant
+// we build up statik shiv charges and discharge it when we choose to open a valve
