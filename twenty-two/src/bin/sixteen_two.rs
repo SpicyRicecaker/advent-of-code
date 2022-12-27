@@ -28,7 +28,8 @@ fn main() {
     let mut r = RecursionInfo::new();
     r.run();
     // expect DD20*28(560) + BB13*25(325) + JJ21*21(441) + HH22*13(286)
-    dbg!(r);
+    // dbg!(r);
+    println!("{}", r.state_best.p.value);
 }
 
 #[derive(Debug)]
@@ -78,7 +79,7 @@ impl RecursionInfo {
                 });
             let (flows, m): (Vec<_>, Vec<_>) = m.values().cloned().unzip();
 
-            let index_a = legend.iter().position(|s| s == "AA").unwrap();
+            let i_a = legend.iter().position(|s| s == "AA").unwrap();
             // we have map + flows, need to convert into an adjacency matrix
             let mut x = vec![vec![u32::MAX; flows.len()]; flows.len()];
 
@@ -91,24 +92,24 @@ impl RecursionInfo {
 
             let m = floyd_warshall(x);
 
-            dbg!(&m);
+            // dbg!(&m);
 
             // generate new flow list and matric by collapsing old
             // .||    .|
             // --| -> -|
             // ---
 
-            let iter = (0..m.len()).filter(|&n| flows[n] != 0 || n == index_a);
+            let iter = (0..m.len()).filter(|&n| flows[n] != 0 || n == i_a);
 
-            let mut i_a = 0;
-
+            let mut i_a_new = 0;
             let m: Vec<Vec<_>> = iter
+                // KEEP THIS ENUMERATE
                 .clone()
-                .map(|y| {
-                    if y == index_a {
-                        i_a = y;
+                .enumerate()
+                .map(|(i, y)| {
+                    if y == i_a {
+                        i_a_new = i;
                     }
-
                     iter.clone().map(|x| m[y][x]).collect()
                 })
                 .collect();
@@ -117,7 +118,7 @@ impl RecursionInfo {
 
             // convert to adjacency matrix + lookup matrix
             // for traveled & opened, use u64, since we know there are only 57 elements max lol
-            (m, flows, i_a)
+            (m, flows, i_a_new)
         };
         let players = 1;
         Self {
