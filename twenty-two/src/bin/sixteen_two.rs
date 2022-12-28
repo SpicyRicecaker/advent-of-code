@@ -28,7 +28,8 @@ fn main() {
     let mut r = RecursionInfo::new();
     r.run();
     // expect DD20*28(560) + BB13*25(325) + JJ21*21(441) + HH22*13(286)
-    dbg!(r);
+    // dbg!(r);
+    dbg!(r.get_max_pressure_with_two_players());
 }
 
 // keeps track of the last 8 assignments to itself
@@ -54,16 +55,19 @@ where
     }
 }
 
+// java's idea of using a class for every file is actually really helpful for
+// splitting up and organizing code we can create functions which access a lot
+// of "global" variables easier, since we don't have to pass in all the values
 #[derive(Debug)]
 struct RecursionInfo {
     // set of all permutations of possible paths. I was taught this idea by
     // reddit user u/RookBe in their post @
     // https://www.reddit.com/r/adventofcode/comments/zn6k1l/comment/j1fpf18/?utm_source=share&utm_medium=web2x&context=3
     // which references their blog post at
-    // https://nickymeuleman.netlify.app/garden/aoc2022-day16
-    // essentially the idea is to operate on the set of maximum pressures for a
-    // given **combination (not permutation)** of opened valves, instead of
-    // simulating two players.
+    // https://nickymeuleman.netlify.app/garden/aoc2022-day16 essentially the
+    // idea is to operate on the set of maximum pressures for all given
+    // **combinations (not permutations)** of valves we can open within the time
+    // limit, instead of simulating two players.
     t: BTreeMap<usize, u32>,
     m: Vec<Vec<u32>>,
     flows: Vec<u32>,
@@ -203,7 +207,7 @@ impl RecursionInfo {
         let mut worklist = VecDeque::new();
 
         worklist.push_back(State {
-            t_l: 30,
+            t_l: 26,
             c: self.i_a,
             p: Logu32::new(0),
             t: 0b1 << self.i_a,
@@ -219,6 +223,30 @@ impl RecursionInfo {
             count += 1;
         }
         dbg!(count);
+    }
+
+    fn get_max_pressure_with_two_players(&self) -> u32 {
+        // we have a list of all combinations of opened valves and their
+        // pressures from these, we create another combination of opened valves
+        // which do not intercept at all, and get the max pressure
+
+        let mut p_best = 0;
+
+        let bin_a = 0b1 << self.i_a;
+
+        for (t_a, p_a) in self.t.iter() {
+            for (t_b, p_b) in self.t.iter() {
+               // the only path in common should be the initial a node
+               if t_a & t_b == bin_a {
+                    let p_sum = p_a + p_b;
+                    if p_sum > p_best {
+                        p_best = p_sum;
+                    }
+               }
+            }
+        }
+        
+        p_best
     }
 }
 
