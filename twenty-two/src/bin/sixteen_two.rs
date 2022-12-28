@@ -1,6 +1,6 @@
 use regex::Regex;
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap, VecDeque},
+    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet, VecDeque},
     ops::AddAssign,
     time::Instant,
 };
@@ -29,23 +29,53 @@ fn main() {
     r.run();
     // expect DD20*28(560) + BB13*25(325) + JJ21*21(441) + HH22*13(286)
     // dbg!(r);
-    println!("{}", r.state_best.p.value);
+    println!("{:#?}", r.state_best);
+    let p: Vec<_> = r
+        .state_best
+        .val
+        .t_path
+        .iter()
+        .map(|&(pl, i)| (pl, r.dbg_legend[i].clone()))
+        .collect();
+    println!("path: {:#?}", p);
+}
+
+// keeps track of the last 8 assignments to itself
+#[derive(Clone, Debug)]
+struct Logger<T>
+where
+    T: Clone,
+{
+    val: T,
+    past: Vec<T>,
+}
+
+impl<T> Logger<T>
+where
+    T: Clone,
+{
+    fn new(val: T) -> Self {
+        Self { val, past: vec![] }
+    }
+    fn assign(&mut self, val: T) {
+        self.past.push(self.val.clone());
+        self.val = val;
+    }
 }
 
 #[derive(Debug)]
 struct RecursionInfo {
-    players: usize,
-    state_best: State,
+    state_best: Logger<State>,
     t: HashMap<usize, u32>,
     m: Vec<Vec<u32>>,
     flows: Vec<u32>,
-    i_a: usize,
     worklist: VecDeque<State>,
+    dbg_legend: Vec<String>,
 }
 
 impl RecursionInfo {
     fn new() -> Self {
-        let (m, flows, i_a) = {
+        let (m, flows, i_a, dbg_legend) = {
             let mut legend: Vec<String> = vec![];
             let mut m: BTreeMap<usize, (u32, Vec<usize>)> = BTreeMap::new();
 
@@ -114,49 +144,35 @@ impl RecursionInfo {
                 })
                 .collect();
 
+            let dbg_legend: Vec<_> = iter.clone().map(|i| legend[i].clone()).collect();
+
             let flows: Vec<_> = iter.map(|y| flows[y]).collect();
 
             // convert to adjacency matrix + lookup matrix
             // for traveled & opened, use u64, since we know there are only 57 elements max lol
-            (m, flows, i_a_new)
+            (m, flows, i_a_new, dbg_legend)
         };
-        let players = 1;
+        let players = 2;
+        let t_l = 26;
         Self {
-            players,
-            state_best: State {
-                v_pl: vec![
-                    Player {
-                        t_l: 30,
-                        alive: true,
-                        c: i_a
-                    };
-                    players
-                ],
+            state_best: Logger::new(State {
+                v_pl: vec![Player { t_l, c: i_a }; players],
+                pl_now: 0,
                 p: Logu32::new(0),
                 t: 0b1 << i_a,
-                t_path: vec![i_a],
-            },
+                t_path: vec![(0, i_a), (0, i_a)],
+            }),
             t: HashMap::new(),
             m,
             flows,
-            i_a,
             worklist: VecDeque::new(),
+            dbg_legend,
         }
     }
 
-    fn run_cycle(
-        &mut self,
-        i: usize,
-        dead_count: &mut u32,
-        mut s: State,
-        worklist: &mut VecDeque<State>,
-    ) {
-        let p = &s.v_pl[i];
+    fn run_cycle(&mut self, mut s: State) {
+        let p = &s.v_pl[s.pl_now];
 
-        // if !p.alive {
-        //     *dead_count += 1;
-        //     // worklist.push_back(s);
-        // } else {
         // try traversing
         let mut is_edge_exist = false;
 
@@ -170,85 +186,49 @@ impl RecursionInfo {
             })
             .map(|(i, dist)| (i, p.t_l - *dist - 1))
             .for_each(|(idx, t_l)| {
+                is_edge_exist = true;
+                // travel to new edge and update pressure
                 let mut s = s.clone();
                 s.p += t_l * self.flows[idx];
                 s.t |= 0b1 << idx;
-                s.t_path.push(idx);
+                s.t_path.push((s.pl_now, idx));
 
-                let p = &mut s.v_pl[i];
-                *p = Player { t_l, c: idx, ..*p };
+                // set the current player index to new edge
+                let p = &mut s.v_pl[s.pl_now];
+                *p = Player { t_l, c: idx };
 
-                is_edge_exist = true;
+                // update the next player
+                s.pl_now = (s.pl_now + 1) % s.v_pl.len();
 
-                worklist.push_back(s);
+                self.worklist.push_back(s);
             });
 
         if !is_edge_exist {
-            s.v_pl[i].alive = false;
-            // worklist.push_back(s);
-            *dead_count += 1;
+            s.v_pl.remove(s.pl_now);
+
+            if s.v_pl.is_empty() {
+                if s.p >= self.state_best.val.p {
+                    self.state_best.assign(s);
+                }
+            } else {
+                s.pl_now = (s.pl_now + 1) % s.v_pl.len();
+                self.worklist.push_back(s);
+            }
         }
-        // }
     }
 
     fn run(&mut self) {
-        self.worklist.push_back(self.state_best.clone());
+        self.worklist.push_back(self.state_best.val.clone());
 
+        // alive, in which case we try to move
+        //   if we have no traversable connections, dc
+        // dead, in which case we don't do anything, and wait for the other to finish
+        let mut count = 0;
         while let Some(s) = self.worklist.pop_front() {
-            let mut dead_count = 0;
-
-            let mut worklist_local: VecDeque<State> = VecDeque::new();
-            self.run_cycle(0, &mut dead_count, s.clone(), &mut worklist_local);
-            self.worklist.append(&mut worklist_local);
-
-            if dead_count as usize == s.v_pl.len() {
-                // compare
-                if s.p > self.state_best.p {
-                    self.state_best.p = s.p;
-                }
-            }
+            self.run_cycle(s);
+            count += 1;
         }
-
-        // while let Some(s) = self.worklist.pop_front() {
-        //     // if our current traveled exists in t, lookup
-        //     let mut worklist_local: VecDeque<State> = VecDeque::new();
-
-        //     let mut dead_count = 0;
-
-        //     // alive, in which case we try to move
-        //     //   if we have no traversable connections, dc
-        //     // dead, in which case we don't do anything, and wait for the other to finish
-
-        //     for i in 0..self.players {
-        //         if i == 0 {
-        //             self.run_cycle(i, &mut dead_count, s.clone(), &mut worklist_local);
-        //         } else {
-        //             // pull out what is currently inside the local worklist
-        //             let mut item_idx = 0;
-        //             let worklist_previous_len = worklist_local.len();
-        //             loop {
-        //                 if item_idx == worklist_previous_len {
-        //                     break;
-        //                 }
-
-        //                 let s = worklist_local.pop_front().unwrap();
-
-        //                 self.run_cycle(i, &mut dead_count, s.clone(), &mut worklist_local);
-
-        //                 item_idx += 1;
-        //             }
-        //         }
-        //     }
-
-        //     self.worklist.append(&mut worklist_local);
-
-        //     if dead_count as usize == s.v_pl.len() {
-        //         // compare
-        //         if s.p > self.p_highest {
-        //             self.p_highest = s.p;
-        //         }
-        //     }
-        // }
+        dbg!(count);
     }
 }
 
@@ -286,15 +266,16 @@ impl PartialOrd<u32> for Logu32 {
 #[derive(Debug, Clone)]
 struct State {
     v_pl: Vec<Player>,
+    pl_now: usize,
     p: Logu32,
     t: usize,
-    t_path: Vec<usize>,
+    // player, location
+    t_path: Vec<(usize, usize)>,
 }
 
 #[derive(Debug, Clone)]
 struct Player {
     t_l: u32,
-    alive: bool,
     c: usize,
 }
 
