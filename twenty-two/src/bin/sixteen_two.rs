@@ -1,6 +1,6 @@
 use regex::Regex;
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{btree_map::Entry, BTreeMap, VecDeque},
     ops::AddAssign,
     time::Instant,
 };
@@ -28,16 +28,7 @@ fn main() {
     let mut r = RecursionInfo::new();
     r.run();
     // expect DD20*28(560) + BB13*25(325) + JJ21*21(441) + HH22*13(286)
-    // dbg!(r);
-    println!("{:#?}", r.state_best);
-    let p: Vec<_> = r
-        .state_best
-        .val
-        .t_path
-        .iter()
-        .map(|&(pl, i)| (pl, r.dbg_legend[i].clone()))
-        .collect();
-    println!("path: {:#?}", p);
+    dbg!(r);
 }
 
 // keeps track of the last 8 assignments to itself
@@ -65,11 +56,18 @@ where
 
 #[derive(Debug)]
 struct RecursionInfo {
-    state_best: Logger<State>,
-    t: HashMap<usize, u32>,
+    // set of all permutations of possible paths. I was taught this idea by
+    // reddit user u/RookBe in their post @
+    // https://www.reddit.com/r/adventofcode/comments/zn6k1l/comment/j1fpf18/?utm_source=share&utm_medium=web2x&context=3
+    // which references their blog post at
+    // https://nickymeuleman.netlify.app/garden/aoc2022-day16
+    // essentially the idea is to operate on the set of maximum pressures for a
+    // given **combination (not permutation)** of opened valves, instead of
+    // simulating two players.
+    t: BTreeMap<usize, u32>,
     m: Vec<Vec<u32>>,
     flows: Vec<u32>,
-    worklist: VecDeque<State>,
+    i_a: usize,
     dbg_legend: Vec<String>,
 }
 
@@ -120,7 +118,7 @@ impl RecursionInfo {
                 }
             }
 
-            let m = floyd_warshall(x);
+            let m = shortest_distance_between_all_vertices_via_floyd_warshall(x);
 
             // dbg!(&m);
 
@@ -152,80 +150,72 @@ impl RecursionInfo {
             // for traveled & opened, use u64, since we know there are only 57 elements max lol
             (m, flows, i_a_new, dbg_legend)
         };
-        let players = 2;
-        let t_l = 26;
+
         Self {
-            state_best: Logger::new(State {
-                v_pl: vec![Player { t_l, c: i_a }; players],
-                pl_now: 0,
-                p: Logu32::new(0),
-                t: 0b1 << i_a,
-                t_path: vec![(0, i_a), (0, i_a)],
-            }),
-            t: HashMap::new(),
+            t: BTreeMap::new(),
             m,
             flows,
-            worklist: VecDeque::new(),
+            i_a,
             dbg_legend,
         }
     }
 
-    fn run_cycle(&mut self, mut s: State) {
-        let p = &s.v_pl[s.pl_now];
+    fn visit(&mut self, s: State, worklist: &mut VecDeque<State>) {
+        // check if we've already recorded this combination of paths
+        // if not, add our pressure
+        // if yes, and the pressure generated here is greater, update the
+        // pressure
+        match self.t.entry(s.t) {
+            Entry::Vacant(e) => {
+                e.insert(s.p.value);
+            }
+            Entry::Occupied(mut e) => {
+                if s.p.value > *e.get() {
+                    e.insert(s.p.value);
+                }
+            }
+        }
 
-        // try traversing
-        let mut is_edge_exist = false;
-
-        self.m[p.c]
+        self.m[s.c]
             .iter()
             .enumerate()
-            .filter(|(_, dist)| p.t_l > **dist)
+            .filter(|(_, dist)| s.t_l > **dist)
             .filter(|&(idx, _)| {
                 let bin = 0b1 << idx;
                 bin & s.t != bin
             })
-            .map(|(i, dist)| (i, p.t_l - *dist - 1))
+            .map(|(i, dist)| (i, s.t_l - *dist - 1))
             .for_each(|(idx, t_l)| {
-                is_edge_exist = true;
                 // travel to new edge and update pressure
-                let mut s = s.clone();
+                let mut s = State {
+                    t_l,
+                    c: idx,
+                    ..s.clone()
+                };
                 s.p += t_l * self.flows[idx];
                 s.t |= 0b1 << idx;
-                s.t_path.push((s.pl_now, idx));
 
-                // set the current player index to new edge
-                let p = &mut s.v_pl[s.pl_now];
-                *p = Player { t_l, c: idx };
-
-                // update the next player
-                s.pl_now = (s.pl_now + 1) % s.v_pl.len();
-
-                self.worklist.push_back(s);
+                worklist.push_back(s);
             });
-
-        if !is_edge_exist {
-            s.v_pl.remove(s.pl_now);
-
-            if s.v_pl.is_empty() {
-                if s.p >= self.state_best.val.p {
-                    self.state_best.assign(s);
-                }
-            } else {
-                s.pl_now = (s.pl_now + 1) % s.v_pl.len();
-                self.worklist.push_back(s);
-            }
-        }
     }
 
     fn run(&mut self) {
-        self.worklist.push_back(self.state_best.val.clone());
+        let mut worklist = VecDeque::new();
+
+        worklist.push_back(State {
+            t_l: 30,
+            c: self.i_a,
+            p: Logu32::new(0),
+            t: 0b1 << self.i_a,
+        });
 
         // alive, in which case we try to move
         //   if we have no traversable connections, dc
         // dead, in which case we don't do anything, and wait for the other to finish
+
         let mut count = 0;
-        while let Some(s) = self.worklist.pop_front() {
-            self.run_cycle(s);
+        while let Some(s) = worklist.pop_front() {
+            self.visit(s, &mut worklist);
             count += 1;
         }
         dbg!(count);
@@ -265,21 +255,19 @@ impl PartialOrd<u32> for Logu32 {
 
 #[derive(Debug, Clone)]
 struct State {
-    v_pl: Vec<Player>,
-    pl_now: usize,
-    p: Logu32,
-    t: usize,
-    // player, location
-    t_path: Vec<(usize, usize)>,
-}
-
-#[derive(Debug, Clone)]
-struct Player {
     t_l: u32,
     c: usize,
+    p: Logu32,
+    t: usize,
 }
 
-fn floyd_warshall(mut a: Vec<Vec<u32>>) -> Vec<Vec<u32>> {
+// The idea to reduce the amount of permutations we need to compute by finding
+// the shortest distance between all vertices (via floyd-warshall) and then
+// removing vertices which have 0 flow was given to me by some reddit user on
+// r/AdventOfCode
+fn shortest_distance_between_all_vertices_via_floyd_warshall(
+    mut a: Vec<Vec<u32>>,
+) -> Vec<Vec<u32>> {
     for k in 0..a.len() {
         for i in 0..a.len() {
             for j in 0..a.len() {
