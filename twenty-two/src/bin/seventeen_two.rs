@@ -21,7 +21,7 @@ enum Gust {
 
 // left edge is 2 units
 const X_SPAWN_OFFSET: u64 = 2;
-const Y_SPAWN_OFFSET: u64 = 3;
+const Y_SPAWN_OFFSET: u64 = 4;
 
 struct App {
     tick_state: TickState,
@@ -29,6 +29,10 @@ struct App {
     game_board: BTreeMap<u64, BTreeSet<u64>>,
     shapes_iter: Box<dyn Iterator<Item = Shape>>,
     gust_sequence_iter: Box<dyn Iterator<Item = (usize, Gust)>>,
+    amount_of_fallen_shapes: u64,
+    max_amount_of_fallen_shapes: u64,
+    ticks: u64,
+    start_time: Instant,
 }
 
 impl App {
@@ -68,6 +72,10 @@ impl App {
             game_board,
             shapes_iter: Box::new(shapes_iter),
             gust_sequence_iter: Box::new(gust_sequence_iter),
+            amount_of_fallen_shapes: 0,
+            max_amount_of_fallen_shapes: 1000000000000,
+            ticks: 0,
+            start_time: Instant::now(),
         }
     }
 
@@ -165,6 +173,7 @@ impl App {
                             self.game_board.get_mut(x).unwrap().insert(*y);
                         });
                     self.current_shape = None;
+                    self.amount_of_fallen_shapes += 1;
                     self.tick_state = TickState::NeedNewShape;
                 } else {
                     self.tick_state = TickState::LettingNewShapeGust
@@ -225,10 +234,27 @@ impl App {
     }
 
     fn run(&mut self) -> u64 {
-        for _ in 0..1_000_000_000_000usize {
+        while self.amount_of_fallen_shapes != self.max_amount_of_fallen_shapes {
             self.tick();
-            self.render();
-            thread::sleep(Duration::from_secs(1));
+            // self.render();
+            // thread::sleep(Duration::from_millis(100));
+
+            self.ticks += 1;
+
+            if self.ticks % 1000 == 0 {
+                let ratio_completed =
+                    self.amount_of_fallen_shapes as f64 / self.max_amount_of_fallen_shapes as f64;
+
+                let sec_left = self.start_time.elapsed().as_secs_f64() / ratio_completed;
+                let min_left = sec_left / 60f64;
+
+                println!("{:.2} shapes completed. will take approx {} minutes (nevermind space) to finish."
+                    , ratio_completed * 100f64, min_left)
+            }
+
+            // if self.ticks == 1 {
+            //     break;
+            // }
         }
 
         self.find_highest_y()
@@ -292,5 +318,10 @@ mod m {
 
 fn main() {
     let mut app = App::new();
-    app.run();
+
+    println!(
+        "The tower of rocks will be {} rocks tall after {} blocks have stopped falling.",
+        app.run(),
+        app.max_amount_of_fallen_shapes
+    );
 }
