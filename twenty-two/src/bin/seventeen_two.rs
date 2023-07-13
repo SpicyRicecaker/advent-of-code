@@ -1,9 +1,8 @@
+#![allow(unused)]
+
 use std::{
     collections::{BTreeMap, BTreeSet},
-    iter::{Cycle, Enumerate, Map, Peekable},
-    str::Chars,
-    thread,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
 #[derive(Debug)]
@@ -249,7 +248,10 @@ impl App {
                 let min_left = sec_left / 60f64;
 
                 println!("{:.2} shapes completed. will take approx {} minutes (nevermind space) to finish."
-                    , ratio_completed * 100f64, min_left)
+                    , ratio_completed * 100f64, min_left);
+
+                // self.render();
+                // thread::sleep(Duration::from_millis(500));
             }
 
             // if self.ticks == 1 {
@@ -298,21 +300,6 @@ impl Shape {
             Shape::I => vec![[0, 1], [0, 0], [0, 2], [0, 3]],
             Shape::Square => vec![[0, 0], [1, 0], [0, 1], [1, 1]],
         }
-    }
-}
-
-mod m {
-    use super::Shape;
-    #[derive(Hash)]
-    pub struct Input {
-        pub s: Shape,
-        pub i_gust: usize,
-        pub v_countour: Vec<[i32; 2]>,
-    }
-
-    pub struct Output {
-        pub turn: usize,
-        pub height: usize,
     }
 }
 

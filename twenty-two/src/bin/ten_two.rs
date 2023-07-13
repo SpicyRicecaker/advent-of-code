@@ -1,6 +1,6 @@
 fn main() {
     // the draw function is called each second
-    let mut current: usize = 0;
+    let _current: usize = 0;
 
     let mut cycles_completed = 0;
     let mut value: i32 = 1;

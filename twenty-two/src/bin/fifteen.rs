@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::collections::HashSet;
 use std::time::Instant;
 
@@ -19,7 +21,11 @@ struct Sensor {
 }
 
 // we also need a list of beacons, because border
-fn get_invalid_from_row(row: isize, sensors: &[Sensor], beacon_coords: &HashSet<(isize, isize)>) -> usize {
+fn get_invalid_from_row(
+    row: isize,
+    sensors: &[Sensor],
+    beacon_coords: &HashSet<(isize, isize)>,
+) -> usize {
     let mut invalid: HashSet<isize> = HashSet::new();
 
     for sensor in sensors {
@@ -45,7 +51,7 @@ fn main() {
         .unwrap()
         .lines()
         .enumerate()
-        .map(|(idx, l)| {
+        .map(|(_idx, l)| {
             let mut r = r.captures_iter(l);
 
             // dbg!(idx, l);

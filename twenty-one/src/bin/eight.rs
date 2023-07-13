@@ -1,3 +1,4 @@
+#![allow(unused)]
 #[derive(Debug)]
 struct Display {
     input: Vec<String>,
@@ -31,7 +32,7 @@ fn main() {
                 2 | 4 | 3 | 7 => {
                     // dbg!(item);
                     acc + 1
-                },
+                }
                 _ => acc,
             })
         });

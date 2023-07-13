@@ -1,7 +1,7 @@
 mod monkey;
 
 use monkey::*;
-use std::{fmt::Debug, collections::VecDeque};
+use std::{collections::VecDeque};
 
 pub struct MonkeyFactory {
     lcm: usize,
@@ -112,7 +112,7 @@ fn main() {
 
     let rounds = 10_000;
 
-    (0..rounds).for_each(|round| {
+    (0..rounds).for_each(|_round| {
         (0..monkey_treehouse.monkeys.len()).for_each(|m| {
             monkey_treehouse.run(m);
             // println!(

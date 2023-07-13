@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{collections::BTreeMap, ops::RangeInclusive};
 
 #[derive(Debug)]
@@ -39,7 +41,7 @@ impl Board {
                 .clone()
                 .map(|x| {
                     let Some(set) = self.map.get(&x) else {
-                        return "."; 
+                        return ".";
                     };
 
                     match set.get(&y) {
@@ -73,7 +75,10 @@ impl Board {
         );
 
         // ensure the floor exists at this new position lol
-        self.map.entry(new_pos.0).or_insert_with(BTreeMap::new).insert(self.floor, Object::Wall);
+        self.map
+            .entry(new_pos.0)
+            .or_insert_with(BTreeMap::new)
+            .insert(self.floor, Object::Wall);
 
         let Some(set) = self.map.get(&new_pos.0) else {
             return Err(());

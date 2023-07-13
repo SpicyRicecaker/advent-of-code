@@ -1,12 +1,10 @@
-use std::{
-    collections::BTreeMap,
-    ops::RangeInclusive,
-};
+#![allow(unused)]
 
+use std::{collections::BTreeMap, ops::RangeInclusive};
 
 enum Object {
     Sand,
-    Wall
+    Wall,
 }
 
 struct Board {
@@ -41,7 +39,7 @@ impl Board {
                 .clone()
                 .map(|x| {
                     let Some(set) = self.map.get(&x) else {
-                        return "."; 
+                        return ".";
                     };
 
                     match set.get(&y) {
@@ -124,7 +122,10 @@ impl Board {
                     self.drop_sand(Direction::Down)
                 } else {
                     // add to hashmap
-                    self.map.get_mut(&self.tentative_sand[0]).expect("HOW DOES THING COME TO REST WITHOUT PLATFORM UNDERNEATH").insert(self.tentative_sand[1], Object::Sand);
+                    self.map
+                        .get_mut(&self.tentative_sand[0])
+                        .expect("HOW DOES THING COME TO REST WITHOUT PLATFORM UNDERNEATH")
+                        .insert(self.tentative_sand[1], Object::Sand);
                     // cleanup seed
                     self.tentative_sand = [500, 0];
                     Ok(())
@@ -154,13 +155,17 @@ fn main() {
                     // increment xs
                     if start_x != end_x {
                         for i in start_x.min(end_x)..=start_x.max(end_x) {
-                            map.entry(i).or_insert_with(BTreeMap::new).insert(start_y, Object::Wall);
+                            map.entry(i)
+                                .or_insert_with(BTreeMap::new)
+                                .insert(start_y, Object::Wall);
                         }
                     }
                     // increment ys
                     else {
                         for i in start_y.min(end_y)..=start_y.max(end_y) {
-                            map.entry(start_x).or_insert_with(BTreeMap::new).insert(i, Object::Wall);
+                            map.entry(start_x)
+                                .or_insert_with(BTreeMap::new)
+                                .insert(i, Object::Wall);
                         }
                     }
                 });

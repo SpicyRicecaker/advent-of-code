@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 use regex::{CaptureMatches, Regex};
-use std::sync::mpsc::sync_channel;
-use std::thread;
+
+
 use std::time::Instant;
 
 #[derive(Debug, Clone, Copy)]

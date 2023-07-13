@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},
@@ -150,10 +152,13 @@ fn main() {
     println!("{}", space_remaining);
     v.sort();
 
-    let v = v.into_iter().inspect(|n| println!("{n}")).find(|n| n + space_remaining >= 30_000_000).unwrap();
+    let v = v
+        .into_iter()
+        .inspect(|n| println!("{n}"))
+        .find(|n| n + space_remaining >= 30_000_000)
+        .unwrap();
 
     dbg!(v);
-    
 }
 
 fn recurse(entry: Rc<RefCell<Entry>>, v: &mut Vec<usize>) -> usize {

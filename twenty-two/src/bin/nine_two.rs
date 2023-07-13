@@ -1,7 +1,6 @@
-use std::{
-    collections::HashSet,
-    ops::{Add, ControlFlow},
-};
+#![allow(unused)]
+
+use std::{collections::HashSet, ops::Add};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Pos {

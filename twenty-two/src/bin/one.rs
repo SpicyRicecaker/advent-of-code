@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 #[derive(Debug)]
 struct C {
     idx: usize,

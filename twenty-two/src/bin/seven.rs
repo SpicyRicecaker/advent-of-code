@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{
     cell::RefCell,
     rc::{Rc, Weak},

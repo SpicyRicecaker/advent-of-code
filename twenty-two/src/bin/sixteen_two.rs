@@ -1,8 +1,9 @@
+#![allow(unused)]
+
 use regex::Regex;
 use std::{
     collections::{btree_map::Entry, BTreeMap, VecDeque},
     ops::AddAssign,
-    time::Instant,
 };
 
 fn main() {
@@ -236,16 +237,16 @@ impl RecursionInfo {
 
         for (t_a, p_a) in self.t.iter() {
             for (t_b, p_b) in self.t.iter() {
-               // the only path in common should be the initial a node
-               if t_a & t_b == bin_a {
+                // the only path in common should be the initial a node
+                if t_a & t_b == bin_a {
                     let p_sum = p_a + p_b;
                     if p_sum > p_best {
                         p_best = p_sum;
                     }
-               }
+                }
             }
         }
-        
+
         p_best
     }
 }

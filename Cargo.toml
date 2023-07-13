@@ -4,3 +4,5 @@ members = [
     "twenty-one",
     "twenty-two"
 ]
+
+resolver = "2"
