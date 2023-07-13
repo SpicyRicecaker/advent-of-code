@@ -1,7 +1,6 @@
-#![allow(unused)]
-
 use std::{
     collections::{BTreeMap, BTreeSet},
+    ops::ControlFlow,
     time::Instant,
 };
 
@@ -32,6 +31,7 @@ struct App {
     max_amount_of_fallen_shapes: u64,
     ticks: u64,
     start_time: Instant,
+    cleared_lines: u64,
 }
 
 impl App {
@@ -75,6 +75,7 @@ impl App {
             max_amount_of_fallen_shapes: 1000000000000,
             ticks: 0,
             start_time: Instant::now(),
+            cleared_lines: 0,
         }
     }
 
@@ -137,7 +138,12 @@ impl App {
             .unwrap()
             .iter()
             .map(|&[x, y]| [x, y - 1])
-            .any(|[x, y]| self.game_board.get(&x).unwrap().contains(&y));
+            .any(|[x, y]| {
+                let Some(column) = self.game_board.get(&x) else {
+                    return false;
+                };
+                column.contains(&y)
+            });
 
         if !collision {
             self.current_shape
@@ -165,12 +171,31 @@ impl App {
                 if !self.fall() {
                     // add current_shape onto the map
                     self.current_shape
-                        .as_mut()
+                        .as_ref()
                         .unwrap()
-                        .into_iter()
+                        .iter()
                         .for_each(|[x, y]| {
                             self.game_board.get_mut(x).unwrap().insert(*y);
                         });
+                    // for each y level in current_shape, check if there is a full line
+                    let mut v = self.current_shape.as_ref().unwrap().clone();
+                    v.sort_by(|a, b| b.cmp(a));
+
+                    v.into_iter().try_for_each(|[_, y]| {
+                        if (0..7u64).all(|column| {
+                            let Some(column) = self.game_board.get(&column) else {
+                                return false;
+                            };
+                            column.get(&y).is_some()
+                        }) {
+                            self.cleared_lines = y + 1;
+                            self.game_board.clear();
+                            ControlFlow::Break(())
+                        } else {
+                            ControlFlow::Continue(())
+                        }
+                    });
+
                     self.current_shape = None;
                     self.amount_of_fallen_shapes += 1;
                     self.tick_state = TickState::NeedNewShape;
@@ -188,7 +213,7 @@ impl App {
             .values()
             .map(|set| set.iter().rev().next().unwrap())
             .max()
-            .unwrap()
+            .unwrap_or(&0)
     }
 
     fn render(&self) {
