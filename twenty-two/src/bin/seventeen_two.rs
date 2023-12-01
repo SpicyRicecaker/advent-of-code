@@ -1,7 +1,8 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     ops::ControlFlow,
-    time::Instant,
+    thread,
+    time::{Duration, Instant},
 };
 
 #[derive(Debug)]
@@ -177,24 +178,6 @@ impl App {
                         .for_each(|[x, y]| {
                             self.game_board.get_mut(x).unwrap().insert(*y);
                         });
-                    // for each y level in current_shape, check if there is a full line
-                    let mut v = self.current_shape.as_ref().unwrap().clone();
-                    v.sort_by(|a, b| b.cmp(a));
-
-                    v.into_iter().try_for_each(|[_, y]| {
-                        if (0..7u64).all(|column| {
-                            let Some(column) = self.game_board.get(&column) else {
-                                return false;
-                            };
-                            column.get(&y).is_some()
-                        }) {
-                            self.cleared_lines = y + 1;
-                            self.game_board.clear();
-                            ControlFlow::Break(())
-                        } else {
-                            ControlFlow::Continue(())
-                        }
-                    });
 
                     self.current_shape = None;
                     self.amount_of_fallen_shapes += 1;
@@ -260,8 +243,8 @@ impl App {
     fn run(&mut self) -> u64 {
         while self.amount_of_fallen_shapes != self.max_amount_of_fallen_shapes {
             self.tick();
-            // self.render();
-            // thread::sleep(Duration::from_millis(100));
+            self.render();
+            thread::sleep(Duration::from_millis(100));
 
             self.ticks += 1;
 
@@ -299,6 +282,8 @@ pub enum Shape {
 
 impl Shape {
     fn get_coords(self) -> Vec<[u64; 2]> {
+        // 4 shapes in total:
+
         // ####
 
         // .#.
