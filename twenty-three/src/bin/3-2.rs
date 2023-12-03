@@ -7,7 +7,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // loop through, add all numbers to registry
     // have a next_num function which goes to next number in input
 
-    let map: Vec<Vec<char>> = std::fs::read_to_string("3.txt")?
+    let map: Vec<Vec<char>> = std::fs::read_to_string("3-2e.txt")?
         .lines()
         .map(|l| l.chars().collect::<Vec<char>>())
         .collect();
