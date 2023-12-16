@@ -9,7 +9,7 @@ fn test_overlap() {
     assert!(overlap(0..5, 3..6).is_some());
 }
 
-fn overlap(a: Range<i32>, b: Range<i32>) -> Option<Range<i32>> {
+fn overlap(a: Range<i64>, b: Range<i64>) -> Option<Range<i64>> {
     if a.contains(&b.start) && a.contains(&b.end) {
         return Some(b);
     }
@@ -29,7 +29,7 @@ fn overlap(a: Range<i32>, b: Range<i32>) -> Option<Range<i32>> {
     None
 }
 
-fn shift(a: Range<i32>, diff: i32) -> Range<i32> {
+fn shift(a: Range<i64>, diff: i64) -> Range<i64> {
     (a.start + diff)..(a.end + diff)
 }
 
@@ -41,7 +41,7 @@ fn test_complement() {
     assert_eq!(complement(0..10, vec![0..10]), vec![]);
 }
 
-fn complement(a: Range<i32>, mut v: Vec<Range<i32>>) -> Vec<Range<i32>> {
+fn complement(a: Range<i64>, mut v: Vec<Range<i64>>) -> Vec<Range<i64>> {
     // find all as not in v
     // vs are guaranteed to be non-overlapping
     // vs are not guaranteed to be in order
@@ -66,7 +66,7 @@ fn complement(a: Range<i32>, mut v: Vec<Range<i32>>) -> Vec<Range<i32>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let s = std::fs::read_to_string("5-1e.txt").unwrap();
+    let s = std::fs::read_to_string("5.txt").unwrap();
     let mut it = s.lines();
 
     // first line is seeds
@@ -78,29 +78,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // .inspect(|s| {
         //     dbg!(s);
         // })
-        .map(|str| str.parse::<i32>().unwrap())
+        .map(|str| str.parse::<i64>().unwrap())
         .collect();
-    let mut seeds_2: Vec<Range<i32>> = vec![];
+    let mut seeds_2: Vec<Range<i64>> = vec![];
     let mut i = 0_usize;
     while i < seeds.len() {
         seeds_2.push((seeds[i]..(seeds[i] + seeds[i + 1])));
         i += 2;
     }
     let mut seeds = seeds_2;
-    println!("{:#?} seeds", seeds);
-    let mut seeds_2: Vec<Range<i32>> = vec![];
 
     let re = Regex::new(r##".* map:\n((?:\d+(?: |\n))+)"##).unwrap();
 
-    let mut dbg_i = 0;
+    let mut v_ranges: Vec<Vec<(Range<i64>, Range<i64>)>> = vec![];
     re.captures_iter(&s).for_each(|matches| {
         // dbg!("new round DBG");
-        let ranges: Vec<(Range<i32>, Range<i32>)> = matches[1]
+        let ranges: Vec<(Range<i64>, Range<i64>)> = matches[1]
             .lines()
             .map(|l| {
                 let a = l
                     .split_whitespace()
-                    .map(|str| str.parse::<i32>().unwrap())
+                    .map(|str| str.parse::<i64>().unwrap())
                     .collect::<Vec<_>>();
 
                 // could binary search here but input is small
@@ -109,40 +107,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 (a[1]..(a[1] + a[2]), a[0]..(a[0] + a[2]))
             })
             .collect();
-
-        for i in 0..seeds.len() {
-            for j in 0..ranges.len() {
-                if let Some(o) = overlap(seeds[i].clone(), ranges[j].0.clone()) {
-                    seeds_2.push(shift(o, ranges[j].1.start - ranges[j].0.start));
-                }
-            }
-            // find which part of the seed has not been touched
-            for r in complement(
-                seeds[i].clone(),
-                ranges.iter().map(|(s, _)| s.clone()).collect(),
-            ) {
-                // dbg!(&r);
-                seeds_2.push(r);
-            }
-        }
-
-        std::mem::swap(&mut seeds, &mut seeds_2);
-        seeds_2.clear();
-        // if dbg_i == 0 {
-        //     dbg!(&seeds);
-        // }
-
-        // println!(
-        //     "seeds after pass: {:#?}, : {:#?}",
-        //     matches[0].to_string(),
-        //     seeds
-        // );
-        // dbg_i += 1;
+        v_ranges.push(ranges);
     });
 
-    dbg!(&seeds);
-    seeds.sort_by(|a, b| a.start.cmp(&b.start));
-    dbg!(&seeds[0]);
+    let mut smallest_loc = std::i64::MAX;
+
+    let total_seed_ranges = seeds.len();
+    dbg!(total_seed_ranges);
+    for seed_range in seeds.iter() {
+        let seeds_in_this_range = seed_range.end - seed_range.start;
+        dbg!(seeds_in_this_range);
+
+        for seed in seed_range.clone() {
+            let mut seed = seed;
+
+            for ranges in v_ranges.iter() {
+                for range in ranges {
+                    if range.0.contains(&seed) {
+                        seed = (seed - range.0.start) + range.1.start;
+                        break;
+                    }
+                }
+            }
+
+            if seed < smallest_loc {
+                smallest_loc = seed;
+            }
+        }
+    }
+
+    dbg!(smallest_loc);
 
     Ok(())
 }
